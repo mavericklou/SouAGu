@@ -22,16 +22,13 @@ h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
 .form-row button:disabled { background: #bbb; cursor: default; }
 #refreshBtn { background: #fff; color: #555; border: 1px solid #d0d5dd; padding: 8px 14px; font-size: 13px; }
 #refreshBtn:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
-/* -------- 表格工具栏（合并开关 + 设置按钮） -------- */
-.table-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; min-height: 28px; }
-.merge-switch { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #888; user-select: none; cursor: pointer; }
+/* -------- 合并开关 -------- */
+.merge-switch { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #999; user-select: none; cursor: pointer; }
 .switch-track { position: relative; width: 38px; height: 22px; background: #ccc; border-radius: 11px; cursor: pointer; transition: background .2s; flex-shrink: 0; }
 .switch-track.on { background: #1a73e8; }
 .switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: left .2s; }
 .switch-track.on .switch-knob { left: 18px; }
 #mergeCb { display: none; }
-.settings-btn { width: 32px; height: 32px; border: none; border-radius: 8px; background: transparent; color: #999; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; line-height: 1; }
-.settings-btn:hover { background: rgba(0,0,0,0.04); color: #555; }
 
 /* -------- 设置弹窗 -------- */
 #settingsOverlay {
@@ -90,9 +87,11 @@ tr:last-child { border-bottom: none; }
   .form-row { gap: 4px; }
   th, td { padding: 6px 4px; font-size: 12px; }
   .summary { gap: 10px; font-size: 13px; }
+  #settingsPageBtn { height: 32px; padding: 0 10px; font-size: 12px; right: 54px; top: 10px; }
+  #installBtn { width: 32px; height: 32px; font-size: 15px; top: 10px; right: 10px; }
 }
 
-/* -------- 添加到桌面按钮 -------- */
+/* -------- 顶部固定按钮 -------- */
 #installBtn {
   position: fixed; top: 14px; right: 14px; z-index: 9999;
   width: 38px; height: 38px; border-radius: 50%;
@@ -104,6 +103,15 @@ tr:last-child { border-bottom: none; }
 #installBtn:hover { background: rgba(26,115,232,0.22); transform: scale(1.08); }
 #installBtn:active { transform: scale(0.94); }
 #installBtn.hidden { display: none; }
+#settingsPageBtn {
+  position: fixed; top: 14px; right: 56px; z-index: 9999;
+  height: 38px; padding: 0 14px; border-radius: 8px;
+  border: none; background: rgba(0,0,0,0.04); color: #666;
+  font-size: 13px; cursor: pointer; transition: background .15s;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+#settingsPageBtn:hover { background: rgba(0,0,0,0.08); color: #333; }
 
 /* -------- 遮罩层 / 弹窗 -------- */
 #installOverlay {
@@ -147,6 +155,7 @@ tr:last-child { border-bottom: none; }
 
 <!-- 添加到桌面按钮 -->
 <button id="installBtn" title="添加到桌面" aria-label="添加到桌面">📲</button>
+<button id="settingsPageBtn" title="费率设置">设置</button>
 
 <!-- 操作指引弹窗 -->
 <div id="installOverlay" onclick="if(event.target===this)closeInstallOverlay()">
@@ -173,13 +182,12 @@ tr:last-child { border-bottom: none; }
 <div class="summary" id="summary"></div>
 <div class="status" id="status">加载中...</div>
 
-<div class="table-toolbar">
+<div style="text-align:right;margin-bottom:6px">
   <label class="merge-switch" id="mergeSwitch" title="合并相同股票">
     <div class="switch-track" id="switchTrack"><div class="switch-knob"></div></div>
     <span>合并相同</span>
     <input type="checkbox" id="mergeCb">
   </label>
-  <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
 </div>
 
 <!-- 设置弹窗 -->
@@ -537,7 +545,7 @@ tr:last-child { border-bottom: none; }
   });
 
   // 设置
-  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('settingsPageBtn').addEventListener('click', openSettings);
   document.getElementById('settingsSaveBtn').addEventListener('click', function() {
     var stockRate = parseFloat(document.getElementById('stockRate').value);
     var etfRate = parseFloat(document.getElementById('etfRate').value);
