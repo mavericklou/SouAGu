@@ -384,8 +384,10 @@
           break;
         case 'Enter':
           e.preventDefault();
-          if (active) {
-            var c = active.dataset.code;
+          var target = active;
+          if (!target && items.length === 1) target = items[0];
+          if (target) {
+            var c = target.dataset.code;
             for (var i = 0; i < this._data.length; i++) {
               if (this._data[i].c === c) { this._selectStock(this._data[i]); break; }
             }
