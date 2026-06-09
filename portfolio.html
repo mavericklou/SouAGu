@@ -22,8 +22,48 @@ h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
 .form-row button:disabled { background: #bbb; cursor: default; }
 #refreshBtn { background: #fff; color: #555; border: 1px solid #d0d5dd; padding: 8px 14px; font-size: 13px; }
 #refreshBtn:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
-.merge-toggle { display: flex; align-items: center; gap: 3px; cursor: pointer; font-size: 12px; color: #888; user-select: none; margin-left: -4px; }
-.merge-toggle input { width: 14px; height: 14px; cursor: pointer; margin: 0; }
+/* -------- 表格工具栏（合并开关 + 设置按钮） -------- */
+.table-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; min-height: 28px; }
+.merge-switch { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #888; user-select: none; cursor: pointer; }
+.switch-track { position: relative; width: 38px; height: 22px; background: #ccc; border-radius: 11px; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+.switch-track.on { background: #1a73e8; }
+.switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: left .2s; }
+.switch-track.on .switch-knob { left: 18px; }
+#mergeCb { display: none; }
+.settings-btn { width: 32px; height: 32px; border: none; border-radius: 8px; background: transparent; color: #999; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; line-height: 1; }
+.settings-btn:hover { background: rgba(0,0,0,0.04); color: #555; }
+
+/* -------- 设置弹窗 -------- */
+#settingsOverlay {
+  display: none; position: fixed; inset: 0; z-index: 99998;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+#settingsOverlay.show { display: flex; }
+#settingsBox {
+  background: #fff; border-radius: 16px; padding: 28px 24px 22px;
+  max-width: 360px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+  position: relative; animation: popIn .25s ease-out;
+}
+#settingsBox h3 { font-size: 17px; font-weight: 600; margin-bottom: 18px; color: #1d1d1f; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.settings-row label { font-size: 14px; color: #333; }
+.settings-row input { width: 110px; padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; text-align: right; outline: none; }
+.settings-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.12); }
+.settings-row .suffix { font-size: 12px; color: #999; margin-left: 4px; min-width: 16px; }
+.settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.settings-actions button { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.settings-actions .btn-cancel { background: #f0f0f0; color: #666; }
+.settings-actions .btn-cancel:hover { background: #e5e5e5; }
+.settings-actions .btn-save { background: #1a73e8; color: #fff; }
+.settings-actions .btn-save:hover { background: #1557b0; }
+#settingsBox .close-x {
+  position: absolute; top: 10px; right: 14px; border: none; background: none;
+  font-size: 20px; color: #999; cursor: pointer;
+}
+#settingsBox .close-x:hover { color: #333; }
+.settings-hint { font-size: 12px; color: #bbb; margin-top: -6px; margin-bottom: 12px; }
+
 table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 th, td { padding: 9px 8px; text-align: right; font-size: 13px; }
 td:first-child { text-align: left; white-space: nowrap; }
@@ -128,14 +168,46 @@ tr:last-child { border-bottom: none; }
   <input id="cost" type="number" step="0.001" placeholder="成本价" style="flex:0.7">
   <button id="addBtn" disabled>添加</button>
   <button id="refreshBtn" title="刷新行情">刷新</button>
-  <label class="merge-toggle" title="合并相同股票">
-    <input type="checkbox" id="mergeCb">
-    <span class="toggle-label">合并相同</span>
-  </label>
 </div>
 
 <div class="summary" id="summary"></div>
 <div class="status" id="status">加载中...</div>
+
+<div class="table-toolbar">
+  <label class="merge-switch" id="mergeSwitch" title="合并相同股票">
+    <div class="switch-track" id="switchTrack"><div class="switch-knob"></div></div>
+    <span>合并相同</span>
+    <input type="checkbox" id="mergeCb">
+  </label>
+  <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
+</div>
+
+<!-- 设置弹窗 -->
+<div id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+  <div id="settingsBox">
+    <button class="close-x" onclick="closeSettings()">✕</button>
+    <h3>⚙ 佣金费率设置</h3>
+    <div class="settings-hint">按股票代码自动判断类型</div>
+    <div class="settings-row">
+      <label>股票佣金费率</label>
+      <div style="display:flex;align-items:center">
+        <input type="number" id="stockRate" step="0.00001" min="0" max="0.01">
+        <span class="suffix"></span>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>ETF 佣金费率</label>
+      <div style="display:flex;align-items:center">
+        <input type="number" id="etfRate" step="0.00001" min="0" max="0.01">
+        <span class="suffix"></span>
+      </div>
+    </div>
+    <div class="settings-actions">
+      <button class="btn-cancel" onclick="closeSettings()">取消</button>
+      <button class="btn-save" id="settingsSaveBtn">保存</button>
+    </div>
+  </div>
+</div>
 
 <table>
   <thead>
@@ -199,6 +271,27 @@ tr:last-child { border-bottom: none; }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   }
 
+  /* -------- 费率设置 -------- */
+  var SETTINGS_KEY = 'portfolio_fee_settings';
+  function defaultSettings() {
+    return { stockRate: 0.00035, etfRate: 0.00008 };
+  }
+  function loadSettings() {
+    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || defaultSettings(); } catch(e) { return defaultSettings(); }
+  }
+  function saveSettings(s) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  }
+  function openSettings() {
+    var s = loadSettings();
+    document.getElementById('stockRate').value = s.stockRate;
+    document.getElementById('etfRate').value = s.etfRate;
+    document.getElementById('settingsOverlay').classList.add('show');
+  }
+  function closeSettings() {
+    document.getElementById('settingsOverlay').classList.remove('show');
+  }
+
   function render() {
     var list = loadList();
     var tbody = document.getElementById('tbody');
@@ -216,9 +309,15 @@ tr:last-child { border-bottom: none; }
     var merge = document.getElementById('mergeCb').checked;
     var rows = [];
     var totalCost = 0, totalMv = 0, totalPl = 0;
-    var FEE_BUY = 0.00008;
-    var FEE_SELL = 0.00008;
-    var STAMP = 0.0005;
+    var settings = loadSettings();
+    function getFees(code, costVal, mv) {
+      var isEtf = code.charAt(0) === '5' || code.indexOf('159') === 0 || code.indexOf('16') === 0;
+      var rate = isEtf ? settings.etfRate : settings.stockRate;
+      var buyFee = costVal * rate;
+      var sellFee = mv * rate;
+      var stampDuty = isEtf ? 0 : mv * 0.0005;
+      return { buyFee: buyFee, sellFee: sellFee, stampDuty: stampDuty, netVal: mv - sellFee - stampDuty, costWithFees: costVal + buyFee };
+    }
 
     function makeRow(name, code, qty, cost, price, changePct, mv, netVal, costWithFees, pl, delIdx) {
       var cls = price ? (pl > 0 ? 'up' : pl < 0 ? 'down' : 'flat') : '';
@@ -254,17 +353,12 @@ tr:last-child { border-bottom: none; }
         var price = p ? p.price : null;
         var changePct = p ? p.changePct : null;
         var costVal = grp.totalCostVal;
-        var buyFee = costVal * FEE_BUY;
-        var costWithFees = costVal + buyFee;
         var mv = grp.totalQty * (price || 0);
-        var sellFee = mv * FEE_SELL;
-        var stampDuty = mv * STAMP;
-        var netVal = mv - sellFee - stampDuty;
-        var pl = price ? (netVal - costWithFees) : 0;
-        if (price) { totalCost += costWithFees; totalMv += mv; totalPl += pl; }
+        var f = getFees(code, costVal, mv);
+        var pl = price ? (f.netVal - f.costWithFees) : 0;
+        if (price) { totalCost += f.costWithFees; totalMv += mv; totalPl += pl; }
 
-        // delIdx=合并行传入对应组的第一个条目的原始索引（删除时全部删除）
-        rows.push(makeRow(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, netVal, costWithFees, pl, code));
+        rows.push(makeRow(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, f.netVal, f.costWithFees, pl, code));
       }
     } else {
       // 默认：每条独立显示
@@ -274,16 +368,12 @@ tr:last-child { border-bottom: none; }
         var price = p ? p.price : s.lastPrice;
         var changePct = p ? p.changePct : s.lastChangePct;
         var costVal = s.qty * s.cost;
-        var buyFee = costVal * FEE_BUY;
-        var costWithFees = costVal + buyFee;
         var mv = s.qty * (price || 0);
-        var sellFee = mv * FEE_SELL;
-        var stampDuty = mv * STAMP;
-        var netVal = mv - sellFee - stampDuty;
-        var pl = price ? (netVal - costWithFees) : 0;
-        if (price) { totalCost += costWithFees; totalMv += mv; totalPl += pl; }
+        var f = getFees(s.code, costVal, mv);
+        var pl = price ? (f.netVal - f.costWithFees) : 0;
+        if (price) { totalCost += f.costWithFees; totalMv += mv; totalPl += pl; }
 
-        rows.push(makeRow(s.name, s.code, s.qty, s.cost, price, changePct, mv, netVal, costWithFees, pl, i));
+        rows.push(makeRow(s.name, s.code, s.qty, s.cost, price, changePct, mv, f.netVal, f.costWithFees, pl, i));
       }
     }
 
@@ -437,7 +527,25 @@ tr:last-child { border-bottom: none; }
   /* -------- 按钮绑定 -------- */
   document.getElementById('addBtn').addEventListener('click', addStock);
   document.getElementById('refreshBtn').addEventListener('click', refreshAll);
-  document.getElementById('mergeCb').addEventListener('change', render);
+
+  // 自定义开关（隐藏的 checkbox 仅用于状态存储，无需独立事件）
+  document.getElementById('switchTrack').addEventListener('click', function() {
+    var cb = document.getElementById('mergeCb');
+    cb.checked = !cb.checked;
+    this.classList.toggle('on');
+    render();
+  });
+
+  // 设置
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('settingsSaveBtn').addEventListener('click', function() {
+    var stockRate = parseFloat(document.getElementById('stockRate').value);
+    var etfRate = parseFloat(document.getElementById('etfRate').value);
+    if (isNaN(stockRate) || isNaN(etfRate) || stockRate < 0 || etfRate < 0) return;
+    saveSettings({ stockRate: stockRate, etfRate: etfRate });
+    closeSettings();
+    render();
+  });
 
   /* -------- 判断 A 股开市时间（北京时间） -------- */
   function isMarketOpen() {
@@ -455,6 +563,10 @@ tr:last-child { border-bottom: none; }
   }
 
   /* -------- Init -------- */
+  // 初始化开关 UI 状态
+  if (document.getElementById('mergeCb').checked) {
+    document.getElementById('switchTrack').classList.add('on');
+  }
   render();
   refreshPrices().then(function() { render(); });
   setInterval(function() {
@@ -529,6 +641,9 @@ tr:last-child { border-bottom: none; }
 
 function closeInstallOverlay() {
   document.getElementById('installOverlay').classList.remove('show');
+}
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('show');
 }
 </script>
 </body>
