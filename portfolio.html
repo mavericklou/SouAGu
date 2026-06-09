@@ -140,7 +140,6 @@ tr:last-child { border-bottom: none; }
       <th>现价</th>
       <th>持仓金额</th>
       <th>盈亏</th>
-      <th>收益率</th>
       <th></th>
     </tr>
   </thead>
@@ -234,8 +233,7 @@ tr:last-child { border-bottom: none; }
         '<td>' + fmt(s.cost) + '</td>' +
         '<td>' + (price ? fmt(price) + '<br><span class="' + (changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat') + '" style="font-size:11px">' + (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%</span>' : '<span class="flat">--</span>') + '</td>' +
         '<td>' + (price ? fmt(mv) : '<span class="flat">--</span>') + '</td>' +
-        '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) : '--') + '</td>' +
-        '<td class="' + cls + '">' + (price ? (plPct(netVal, costWithFees) > 0 ? '+' : '') + plPct(netVal, costWithFees).toFixed(2) + '%' : '--') + '</td>' +
+        '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) + '<br><span style="font-size:11px">' + (plPct(netVal, costWithFees) > 0 ? '+' : '') + plPct(netVal, costWithFees).toFixed(2) + '%</span>' : '--') + '</td>' +
         '<td><span class="del" data-index="' + i + '">✕</span></td>' +
       '</tr>';
     });
