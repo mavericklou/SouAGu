@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>持仓助手</title>
+<link rel="manifest" href="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@latest/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="持仓助手">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1a73e8">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, "Microsoft YaHei", sans-serif; background: #f5f5f5; color: #333; padding: 20px; max-width: 800px; margin: 0 auto; }
@@ -44,9 +49,73 @@ tr:last-child { border-bottom: none; }
   th, td { padding: 6px 4px; font-size: 12px; }
   .summary { gap: 10px; font-size: 13px; flex-direction: column; }
 }
+
+/* -------- 添加到桌面按钮 -------- */
+#installBtn {
+  position: fixed; top: 14px; right: 14px; z-index: 9999;
+  width: 38px; height: 38px; border-radius: 50%;
+  border: none; background: rgba(26,115,232,0.12); color: #1a73e8;
+  font-size: 18px; cursor: pointer; transition: background .2s, transform .15s;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+#installBtn:hover { background: rgba(26,115,232,0.22); transform: scale(1.08); }
+#installBtn:active { transform: scale(0.94); }
+#installBtn.hidden { display: none; }
+
+/* -------- 遮罩层 / 弹窗 -------- */
+#installOverlay {
+  display: none; position: fixed; inset: 0; z-index: 99999;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+#installOverlay.show { display: flex; }
+#installBox {
+  background: #fff; border-radius: 16px; padding: 28px 24px 22px;
+  max-width: 380px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+  text-align: center; position: relative; animation: popIn .25s ease-out;
+}
+@keyframes popIn {
+  from { transform: scale(0.88); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+#installBox h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; color: #1d1d1f; }
+#installBox .icon-big { font-size: 40px; margin-bottom: 8px; }
+#installBox p { font-size: 13px; color: #666; line-height: 1.5; margin-bottom: 4px; }
+#installBox .steps { text-align: left; margin: 14px 0 18px; }
+#installBox .step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 13px; color: #333; }
+#installBox .step-num {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  background: #1a73e8; color: #fff; font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+#installBox .close-btn {
+  margin-top: 6px; padding: 8px 24px; border: none; border-radius: 8px;
+  background: #1a73e8; color: #fff; font-size: 14px; cursor: pointer;
+}
+#installBox .close-btn:hover { background: #1557b0; }
+#installBox .close-x {
+  position: absolute; top: 10px; right: 14px; border: none; background: none;
+  font-size: 20px; color: #999; cursor: pointer;
+}
+#installBox .close-x:hover { color: #333; }
 </style>
 </head>
 <body>
+
+<!-- 添加到桌面按钮 -->
+<button id="installBtn" title="添加到桌面" aria-label="添加到桌面">📲</button>
+
+<!-- 操作指引弹窗 -->
+<div id="installOverlay" onclick="if(event.target===this)closeInstallOverlay()">
+  <div id="installBox">
+    <button class="close-x" onclick="closeInstallOverlay()">✕</button>
+    <div class="icon-big" id="ovIcon">📲</div>
+    <h3 id="ovTitle">添加到桌面</h3>
+    <div id="ovBody"></div>
+    <button class="close-btn" onclick="closeInstallOverlay()">知道了</button>
+  </div>
+</div>
 
 <h1>📊 持仓助手</h1>
 <div class="subtitle">支持代码/名称/拼音搜索 — 双击可开，无需服务器</div>
@@ -334,6 +403,72 @@ tr:last-child { border-bottom: none; }
     refreshPrices().then(function() { render(); });
   }, 30000);
 })();
-</script>
+
+/* -------- 添加到桌面 (全局) -------- */
+(function() {
+  var btn = document.getElementById('installBtn');
+  var ov = document.getElementById('installOverlay');
+  var deferredPrompt = null;
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isInStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+
+  // 已经是桌面版 → 隐藏按钮
+  if (isInStandalone) { btn.classList.add('hidden'); return; }
+
+  // Android Chrome: 捕获安装事件
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+
+  // Android Chrome: 安装成功/失败后重置
+  window.addEventListener('appinstalled', function() {
+    deferredPrompt = null;
+    btn.classList.add('hidden');
+  });
+
+  btn.addEventListener('click', function() {
+    // 1) Android: 有 deferredPrompt → 触发系统安装弹窗
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function() { deferredPrompt = null; });
+      return;
+    }
+
+    // 2) iOS → 显示指引
+    if (isIOS) {
+      document.getElementById('ovIcon').textContent = '🍎';
+      document.getElementById('ovTitle').textContent = '添加到主屏幕';
+      document.getElementById('ovBody').innerHTML =
+        '<div class="steps">' +
+          '<div class="step"><span class="step-num">1</span> 在 Safari 底部点击 <b>分享</b> 按钮 <span style="font-size:18px">⎙</span></div>' +
+          '<div class="step"><span class="step-num">2</span> 向下滑动，找到 <b>"添加到主屏幕"</b></div>' +
+          '<div class="step"><span class="step-num">3</span> 点右上角 <b>"添加"</b>，完成</div>' +
+        '</div>' +
+        '<p style="color:#999;font-size:12px">提示：请在 Safari 中打开此页面，而非微信/QQ 内置浏览器</p>';
+      ov.classList.add('show');
+      return;
+    }
+
+    // 3) Android 但没有 deferredPrompt（从 file:// 打开等）→ 通用指引
+    document.getElementById('ovIcon').textContent = '📱';
+    document.getElementById('ovTitle').textContent = '添加到桌面';
+    var isAndroid = /Android/.test(navigator.userAgent);
+    document.getElementById('ovBody').innerHTML = isAndroid
+      ? '<div class="steps">' +
+          '<div class="step"><span class="step-num">1</span> 在 Chrome 点右上角 <b>⋮ 菜单</b></div>' +
+          '<div class="step"><span class="step-num">2</span> 选择 <b>"添加到主屏幕"</b></div>' +
+          '<div class="step"><span class="step-num">3</span> 点 <b>"添加"</b>，完成</div>' +
+        '</div>' +
+        '<p style="color:#999;font-size:12px">提示：请通过 GitHub Pages 链接打开再试，可用系统安装弹窗</p>'
+      : '<p>请在手机浏览器中打开此页面，使用浏览器的"添加到主屏幕"功能。</p>';
+    ov.classList.add('show');
+  });
+})();
+
+function closeInstallOverlay() {
+  document.getElementById('installOverlay').classList.remove('show');
+}
 </body>
 </html>
