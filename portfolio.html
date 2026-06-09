@@ -317,7 +317,7 @@ tr:last-child { border-bottom: none; }
 
       var codes = list.map(function(s) {
         var c = s.code.padStart(6, '0');
-        if (c.charAt(0) === '6') return 'sh' + c;
+        if (c.charAt(0) === '6' || c.charAt(0) === '5') return 'sh' + c;
         if (c.charAt(0) === '8' || c.charAt(0) === '9' || c.charAt(0) === '4') return 'bj' + c;
         return 'sz' + c;
       });
