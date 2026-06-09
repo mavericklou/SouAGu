@@ -65,6 +65,11 @@ table { width: 100%; border-collapse: collapse; background: #fff; border-radius:
 th, td { padding: 9px 8px; text-align: right; font-size: 13px; }
 td:first-child { text-align: left; white-space: nowrap; }
 th { background: #fafafa; font-weight: 500; color: #666; text-align: right; white-space: nowrap; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { background: #f0f0f0; }
+th .si { font-size: 11px; color: #bbb; margin-left: 2px; }
+th .si.asc { color: #1a73e8; }
+th .si.desc { color: #1a73e8; }
 td:first-child, th:first-child { text-align: left; }
 td .ac-code { display: block; color: #999; font-size: 11px; line-height: 1.4; }
 tr { border-bottom: 1px solid #f0f0f0; }
@@ -226,12 +231,12 @@ tr:last-child { border-bottom: none; }
 <table>
   <thead>
     <tr>
-      <th>股票</th>
-      <th>持股</th>
-      <th>成本</th>
-      <th>现价</th>
-      <th>持仓金额</th>
-      <th>盈亏</th>
+      <th data-col="name" class="sortable">股票 <span class="si"></span></th>
+      <th data-col="qty" class="sortable">持股 <span class="si"></span></th>
+      <th data-col="cost" class="sortable">成本 <span class="si"></span></th>
+      <th data-col="price" class="sortable">现价 <span class="si"></span></th>
+      <th data-col="mv" class="sortable">持仓金额 <span class="si"></span></th>
+      <th data-col="pl" class="sortable">盈亏 <span class="si"></span></th>
       <th></th>
     </tr>
   </thead>
@@ -250,6 +255,7 @@ tr:last-child { border-bottom: none; }
   var STORAGE_KEY = 'portfolio_holdings';
   var selectedStock = null;
   var prices = {};
+  var sortCol = null, sortDir = null; // null = 默认按时间倒序
 
   /* -------- SouAGu 组件 -------- */
   var ss = new SouAGu('#stockSearchContainer', {
@@ -279,7 +285,16 @@ tr:last-child { border-bottom: none; }
 
   /* -------- 存储 -------- */
   function loadList() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch(e) { return []; }
+    try {
+      var list = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      var changed = false;
+      for (var i = 0; i < list.length; i++) {
+        if (!list[i].createdAt) { list[i].createdAt = '2026-01-01T00:00:00'; changed = true; }
+        if (!list[i].id) { list[i].id = Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2,8); changed = true; }
+      }
+      if (changed) saveList(list);
+      return list;
+    } catch(e) { return []; }
   }
   function saveList(list) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
@@ -327,12 +342,13 @@ tr:last-child { border-bottom: none; }
       tbody.innerHTML = '';
       empty.style.display = 'block';
       summary.innerHTML = '';
+      updateSortIndicators();
       return;
     }
     empty.style.display = 'none';
 
     var merge = document.getElementById('mergeCb').checked;
-    var rows = [];
+    var rowData = [];
     var totalCost = 0, totalMv = 0, totalPl = 0;
     var settings = loadSettings();
     function getFees(code, costVal, mv) {
@@ -345,10 +361,10 @@ tr:last-child { border-bottom: none; }
       return { buyFee: buyFee, sellFee: sellFee, stampDuty: stampDuty, netVal: mv - sellFee - stampDuty, costWithFees: costVal + buyFee };
     }
 
-    function makeRow(name, code, qty, cost, price, changePct, mv, netVal, costWithFees, pl, delIdx) {
+    function buildRowData(name, code, qty, cost, price, changePct, mv, netVal, costWithFees, pl, delIdx, createdAt) {
       var cls = price ? (pl > 0 ? 'up' : pl < 0 ? 'down' : 'flat') : '';
       var plPctVal = costWithFees ? ((netVal - costWithFees) / costWithFees * 100) : 0;
-      return '<tr>' +
+      var html = '<tr>' +
         '<td>' + name + '<span class="ac-code"> ' + code + '</span></td>' +
         '<td>' + fmt0(qty) + '</td>' +
         '<td>' + fmt(cost) + '</td>' +
@@ -357,19 +373,19 @@ tr:last-child { border-bottom: none; }
         '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) + '<br><span style="font-size:11px">' + (plPctVal > 0 ? '+' : '') + plPctVal.toFixed(2) + '%</span>' : '--') + '</td>' +
         '<td><span class="del" data-index="' + delIdx + '">✕</span></td>' +
       '</tr>';
+      return { html: html, name: name, code: code, time: createdAt || '2026-01-01T00:00:00', qty: qty, cost: cost, price: price || 0, mv: mv, pl: pl };
     }
 
     if (merge) {
-      // 合并模式：按代码分组，显示汇总行
       var groups = {};
       for (var i = 0; i < list.length; i++) {
         var s = list[i];
-        if (!groups[s.code]) groups[s.code] = { name: s.name, items: [], totalQty: 0, totalCostVal: 0 };
+        if (!groups[s.code]) groups[s.code] = { name: s.name, items: [], totalQty: 0, totalCostVal: 0, latestTime: '' };
         groups[s.code].items.push(i);
         groups[s.code].totalQty += s.qty;
         groups[s.code].totalCostVal += s.qty * s.cost;
+        if (s.createdAt > (groups[s.code].latestTime || '')) groups[s.code].latestTime = s.createdAt;
       }
-
       var codeKeys = Object.keys(groups);
       for (var g = 0; g < codeKeys.length; g++) {
         var code = codeKeys[g];
@@ -383,11 +399,9 @@ tr:last-child { border-bottom: none; }
         var f = getFees(code, costVal, mv);
         var pl = price ? (f.netVal - f.costWithFees) : 0;
         if (price) { totalCost += f.costWithFees; totalMv += mv; totalPl += pl; }
-
-        rows.push(makeRow(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, f.netVal, f.costWithFees, pl, code));
+        rowData.push(buildRowData(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, f.netVal, f.costWithFees, pl, code, grp.latestTime));
       }
     } else {
-      // 默认：每条独立显示
       for (var i = 0; i < list.length; i++) {
         var s = list[i];
         var p = prices[s.code];
@@ -398,14 +412,35 @@ tr:last-child { border-bottom: none; }
         var f = getFees(s.code, costVal, mv);
         var pl = price ? (f.netVal - f.costWithFees) : 0;
         if (price) { totalCost += f.costWithFees; totalMv += mv; totalPl += pl; }
-
-        rows.push(makeRow(s.name, s.code, s.qty, s.cost, price, changePct, mv, f.netVal, f.costWithFees, pl, i));
+        rowData.push(buildRowData(s.name, s.code, s.qty, s.cost, price, changePct, mv, f.netVal, f.costWithFees, pl, i, s.createdAt));
       }
     }
 
-    tbody.innerHTML = rows.join('');
+    // Sort
+    if (sortCol && sortDir) {
+      var sortFn;
+      if (sortCol === 'name') {
+        sortFn = function(a,b) { return a.name.localeCompare(b.name, 'zh'); };
+      } else if (sortCol === 'qty') {
+        sortFn = function(a,b) { return a.qty - b.qty; };
+      } else if (sortCol === 'cost') {
+        sortFn = function(a,b) { return a.cost - b.cost; };
+      } else if (sortCol === 'price') {
+        sortFn = function(a,b) { return a.price - b.price; };
+      } else if (sortCol === 'mv') {
+        sortFn = function(a,b) { return a.mv - b.mv; };
+      } else if (sortCol === 'pl') {
+        sortFn = function(a,b) { return a.pl - b.pl; };
+      }
+      if (sortDir === 'desc') { var _f = sortFn; sortFn = function(a,b) { return _f(b,a); }; }
+      rowData.sort(sortFn);
+    } else {
+      // 默认按添加时间倒序（最新在前）
+      rowData.sort(function(a,b) { return b.time.localeCompare(a.time); });
+    }
 
-    // Bind delete clicks
+    tbody.innerHTML = rowData.map(function(r) { return r.html; }).join('');
+
     tbody.querySelectorAll('.del').forEach(function(el) {
       el.addEventListener('click', function() {
         var val = el.dataset.index;
@@ -420,7 +455,6 @@ tr:last-child { border-bottom: none; }
       '<span>总市值: ' + fmt(totalMv) + '</span>' +
       '<span class="' + cls + '">总盈亏: ' + (totalPl >= 0 ? '+' : '') + fmt(totalPl) + ' (' + (totalPlPctVal >= 0 ? '+' : '') + totalPlPctVal.toFixed(2) + '%)</span>';
 
-    // Persist lastPrice
     var list2 = loadList();
     var changed = false;
     for (var i = 0; i < list2.length; i++) {
@@ -432,6 +466,36 @@ tr:last-child { border-bottom: none; }
       }
     }
     if (changed) saveList(list2);
+
+    updateSortIndicators();
+  }
+
+  function updateSortIndicators() {
+    var ths = document.querySelectorAll('th.sortable');
+    ths.forEach(function(th) {
+      var col = th.dataset.col;
+      var si = th.querySelector('.si');
+      if (sortCol === col && sortDir) {
+        si.textContent = sortDir === 'asc' ? '▲' : '▼';
+        si.className = 'si ' + sortDir;
+      } else {
+        si.textContent = '⇅';
+        si.className = 'si';
+      }
+    });
+  }
+
+  function handleSortClick(col) {
+    if (sortCol === col && sortDir === 'asc') {
+      sortDir = 'desc';
+    } else if (sortCol === col && sortDir === 'desc') {
+      sortCol = null;
+      sortDir = null;
+    } else {
+      sortCol = col;
+      sortDir = 'asc';
+    }
+    render();
   }
 
   function plPct(price, cost) { return cost ? ((price - cost) / cost * 100) : 0; }
@@ -446,7 +510,7 @@ tr:last-child { border-bottom: none; }
     if (!qty || !cost) return;
 
     var list = loadList();
-    list.push({ code: s.c, name: s.n, qty: qty, cost: cost, lastPrice: null, lastChangePct: null });
+    list.push({ code: s.c, name: s.n, qty: qty, cost: cost, createdAt: new Date().toISOString(), lastPrice: null, lastChangePct: null });
     saveList(list);
 
     ss.clear();
@@ -560,6 +624,12 @@ tr:last-child { border-bottom: none; }
     cb.checked = !cb.checked;
     document.getElementById('switchTrack').classList.toggle('on');
     render();
+  });
+
+  // 排序：事件委托
+  document.querySelector('thead').addEventListener('click', function(e) {
+    var th = e.target.closest('th.sortable');
+    if (th) handleSortClick(th.dataset.col);
   });
 
   // 设置
