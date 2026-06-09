@@ -213,41 +213,88 @@ tr:last-child { border-bottom: none; }
     }
     empty.style.display = 'none';
 
+    var merge = document.getElementById('mergeCb').checked;
+    var rows = [];
     var totalCost = 0, totalMv = 0, totalPl = 0;
     var FEE_BUY = 0.00008;
     var FEE_SELL = 0.00008;
     var STAMP = 0.0005;
 
-    var rows = list.map(function(s, i) {
-      var p = prices[s.code];
-      var price = p ? p.price : s.lastPrice;
-      var changePct = p ? p.changePct : s.lastChangePct;
-      var costVal = s.qty * s.cost;
-      var buyFee = costVal * FEE_BUY;
-      var costWithFees = costVal + buyFee;
-      var mv = s.qty * (price || 0);
-      var sellFee = mv * FEE_SELL;
-      var stampDuty = mv * STAMP;
-      var netVal = mv - sellFee - stampDuty;
-      var pl = price ? (netVal - costWithFees) : 0;
-      if (price) { totalCost += costWithFees; totalMv += mv; totalPl += pl; }
-
+    function makeRow(name, code, qty, cost, price, changePct, mv, netVal, costWithFees, pl, delIdx) {
       var cls = price ? (pl > 0 ? 'up' : pl < 0 ? 'down' : 'flat') : '';
+      var plPctVal = costWithFees ? ((netVal - costWithFees) / costWithFees * 100) : 0;
       return '<tr>' +
-        '<td>' + s.name + '<span class="ac-code"> ' + s.code + '</span></td>' +
-        '<td>' + fmt0(s.qty) + '</td>' +
-        '<td>' + fmt(s.cost) + '</td>' +
+        '<td>' + name + '<span class="ac-code"> ' + code + '</span></td>' +
+        '<td>' + fmt0(qty) + '</td>' +
+        '<td>' + fmt(cost) + '</td>' +
         '<td>' + (price ? fmt(price) + '<br><span class="' + (changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat') + '" style="font-size:11px">' + (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%</span>' : '<span class="flat">--</span>') + '</td>' +
         '<td>' + (price ? fmt(mv) : '<span class="flat">--</span>') + '</td>' +
-        '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) + '<br><span style="font-size:11px">' + (plPct(netVal, costWithFees) > 0 ? '+' : '') + plPct(netVal, costWithFees).toFixed(2) + '%</span>' : '--') + '</td>' +
-        '<td><span class="del" data-index="' + i + '">✕</span></td>' +
+        '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) + '<br><span style="font-size:11px">' + (plPctVal > 0 ? '+' : '') + plPctVal.toFixed(2) + '%</span>' : '--') + '</td>' +
+        '<td><span class="del" data-index="' + delIdx + '">✕</span></td>' +
       '</tr>';
-    });
+    }
+
+    if (merge) {
+      // 合并模式：按代码分组，显示汇总行
+      var groups = {};
+      for (var i = 0; i < list.length; i++) {
+        var s = list[i];
+        if (!groups[s.code]) groups[s.code] = { name: s.name, items: [], totalQty: 0, totalCostVal: 0 };
+        groups[s.code].items.push(i);
+        groups[s.code].totalQty += s.qty;
+        groups[s.code].totalCostVal += s.qty * s.cost;
+      }
+
+      var codeKeys = Object.keys(groups);
+      for (var g = 0; g < codeKeys.length; g++) {
+        var code = codeKeys[g];
+        var grp = groups[code];
+        var avgCost = grp.totalCostVal / grp.totalQty;
+        var p = prices[code];
+        var price = p ? p.price : null;
+        var changePct = p ? p.changePct : null;
+        var costVal = grp.totalCostVal;
+        var buyFee = costVal * FEE_BUY;
+        var costWithFees = costVal + buyFee;
+        var mv = grp.totalQty * (price || 0);
+        var sellFee = mv * FEE_SELL;
+        var stampDuty = mv * STAMP;
+        var netVal = mv - sellFee - stampDuty;
+        var pl = price ? (netVal - costWithFees) : 0;
+        if (price) { totalCost += costWithFees; totalMv += mv; totalPl += pl; }
+
+        // delIdx=合并行传入对应组的第一个条目的原始索引（删除时全部删除）
+        rows.push(makeRow(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, netVal, costWithFees, pl, code));
+      }
+    } else {
+      // 默认：每条独立显示
+      for (var i = 0; i < list.length; i++) {
+        var s = list[i];
+        var p = prices[s.code];
+        var price = p ? p.price : s.lastPrice;
+        var changePct = p ? p.changePct : s.lastChangePct;
+        var costVal = s.qty * s.cost;
+        var buyFee = costVal * FEE_BUY;
+        var costWithFees = costVal + buyFee;
+        var mv = s.qty * (price || 0);
+        var sellFee = mv * FEE_SELL;
+        var stampDuty = mv * STAMP;
+        var netVal = mv - sellFee - stampDuty;
+        var pl = price ? (netVal - costWithFees) : 0;
+        if (price) { totalCost += costWithFees; totalMv += mv; totalPl += pl; }
+
+        rows.push(makeRow(s.name, s.code, s.qty, s.cost, price, changePct, mv, netVal, costWithFees, pl, i));
+      }
+    }
+
     tbody.innerHTML = rows.join('');
 
     // Bind delete clicks
     tbody.querySelectorAll('.del').forEach(function(el) {
-      el.addEventListener('click', function() { removeStock(parseInt(el.dataset.index)); });
+      el.addEventListener('click', function() {
+        var val = el.dataset.index;
+        removeStock(merge ? val : parseInt(val));
+      });
     });
 
     var totalPlPctVal = totalCost ? (totalPl / totalCost * 100) : 0;
@@ -283,31 +330,7 @@ tr:last-child { border-bottom: none; }
     if (!qty || !cost) return;
 
     var list = loadList();
-    var merge = document.getElementById('mergeCb').checked;
-
-    if (merge) {
-      // 合并相同股票：找已存在的同一代码，加权均价
-      var found = false;
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].code === s.c) {
-          var oldQty = list[i].qty;
-          var oldCost = list[i].cost;
-          var newQty = oldQty + qty;
-          var newCost = (oldQty * oldCost + qty * cost) / newQty;
-          list[i].qty = newQty;
-          list[i].cost = newCost;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        list.push({ code: s.c, name: s.n, qty: qty, cost: cost, lastPrice: null, lastChangePct: null });
-      }
-    } else {
-      // 默认：每次添加是一条独立操作，代码可重复
-      list.push({ code: s.c, name: s.n, qty: qty, cost: cost, lastPrice: null, lastChangePct: null });
-    }
-
+    list.push({ code: s.c, name: s.n, qty: qty, cost: cost, lastPrice: null, lastChangePct: null });
     saveList(list);
 
     ss.clear();
@@ -321,9 +344,15 @@ tr:last-child { border-bottom: none; }
     refreshPrices();
   }
 
-  function removeStock(i) {
+  function removeStock(id) {
     var list = loadList();
-    list.splice(i, 1);
+    var merge = document.getElementById('mergeCb').checked;
+    if (merge && typeof id === 'string') {
+      // 合并模式：按代码删除所有条目
+      list = list.filter(function(s) { return s.code !== id; });
+    } else {
+      list.splice(id, 1);
+    }
     saveList(list);
     render();
   }
@@ -408,6 +437,7 @@ tr:last-child { border-bottom: none; }
   /* -------- 按钮绑定 -------- */
   document.getElementById('addBtn').addEventListener('click', addStock);
   document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+  document.getElementById('mergeCb').addEventListener('change', render);
 
   /* -------- 判断 A 股开市时间（北京时间） -------- */
   function isMarketOpen() {
