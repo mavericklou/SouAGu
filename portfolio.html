@@ -183,11 +183,11 @@ tr:last-child { border-bottom: none; }
 <div class="status" id="status">加载中...</div>
 
 <div style="text-align:right;margin-bottom:6px">
-  <label class="merge-switch" id="mergeSwitch" title="合并相同股票">
+  <div class="merge-switch" id="mergeSwitch" title="合并相同股票">
     <div class="switch-track" id="switchTrack"><div class="switch-knob"></div></div>
     <span>合并相同</span>
     <input type="checkbox" id="mergeCb">
-  </label>
+  </div>
 </div>
 
 <!-- 设置弹窗 -->
@@ -563,11 +563,11 @@ tr:last-child { border-bottom: none; }
   document.getElementById('addBtn').addEventListener('click', addStock);
   document.getElementById('refreshBtn').addEventListener('click', refreshAll);
 
-  // 自定义开关（隐藏的 checkbox 仅用于状态存储，无需独立事件）
-  document.getElementById('switchTrack').addEventListener('click', function() {
+  // 自定义开关
+  document.getElementById('mergeSwitch').addEventListener('click', function() {
     var cb = document.getElementById('mergeCb');
     cb.checked = !cb.checked;
-    this.classList.toggle('on');
+    document.getElementById('switchTrack').classList.toggle('on');
     render();
   });
 
