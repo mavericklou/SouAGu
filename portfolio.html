@@ -20,9 +20,6 @@ h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
 .form-row button { padding: 8px 18px; background: #1a73e8; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; white-space: nowrap; }
 .form-row button:hover { background: #1557b0; }
 .form-row button:disabled { background: #bbb; cursor: default; }
-.actions { display: flex; gap: 8px; margin-bottom: 12px; }
-.actions button { padding: 6px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; cursor: pointer; background: #fff; }
-.actions button:hover { background: #f0f0f0; }
 table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 th, td { padding: 9px 8px; text-align: right; font-size: 13px; }
 th { background: #fafafa; font-weight: 500; color: #666; text-align: right; white-space: nowrap; }
@@ -125,11 +122,7 @@ tr:last-child { border-bottom: none; }
   <input id="qty" type="number" placeholder="持股数" style="flex:0.7">
   <input id="cost" type="number" step="0.001" placeholder="成本价" style="flex:0.7">
   <button id="addBtn" disabled>添加</button>
-</div>
-
-<div class="actions">
-  <button id="refreshBtn">🔄 刷新</button>
-  <button id="clearBtn">🗑 清空</button>
+  <button id="refreshBtn" title="刷新行情">🔄</button>
 </div>
 
 <div class="summary" id="summary"></div>
@@ -306,14 +299,6 @@ tr:last-child { border-bottom: none; }
     render();
   }
 
-  function clearAll() {
-    if (!confirm('确认清空所有持仓？')) return;
-    saveList([]);
-    prices = {};
-    render();
-    document.getElementById('status').textContent = '已清空';
-  }
-
   function refreshAll() {
     refreshPrices().then(function() { render(); });
   }
@@ -394,7 +379,6 @@ tr:last-child { border-bottom: none; }
   /* -------- 按钮绑定 -------- */
   document.getElementById('addBtn').addEventListener('click', addStock);
   document.getElementById('refreshBtn').addEventListener('click', refreshAll);
-  document.getElementById('clearBtn').addEventListener('click', clearAll);
 
   /* -------- Init -------- */
   render();

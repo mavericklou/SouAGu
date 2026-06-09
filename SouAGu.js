@@ -249,7 +249,7 @@
           '<input class="ss-input ' + this._opt.inputClass + '" type="text" placeholder="' + this._opt.placeholder + '" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;">' +
           '<span class="ss-clear" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;line-height:1;color:#999;user-select:none;">&times;</span>' +
         '</div>' +
-        '<div class="ss-dropdown ' + this._opt.dropdownClass + '" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:' + this._opt.zIndex + ';max-height:360px;overflow-y:auto;"></div>' +
+        '<div class="ss-dropdown ' + this._opt.dropdownClass + '" style="display:none;position:absolute;top:100%;left:0;min-width:100%;z-index:' + this._opt.zIndex + ';max-height:360px;overflow-y:auto;"></div>' +
       '</div>';
 
       this._wrapper = this._container.querySelector('.ss-wrapper');
@@ -290,6 +290,8 @@
           'box-shadow: ' + (isDark ? '0 8px 24px rgba(0,0,0,.4)' : '0 8px 24px rgba(0,0,0,.12)') + ';' +
           'margin-top: 4px;' +
           'padding: 4px 0;' +
+          'width: max-content;' +
+          'max-width: min(100vw - 20px, 600px);' +
         '}' +
         '.ss-item {' +
           'display: flex; align-items: center; gap: 10px;' +
@@ -305,7 +307,7 @@
           'font-size: 12px; color: ' + (isDark ? '#888' : '#888') + ';' +
           'min-width: 64px;' +
         '}' +
-        '.ss-item .ss-name { flex: 1; font-size: 14px; }' +
+        '.ss-item .ss-name { flex: 1; font-size: 14px; white-space: nowrap; }' +
         '.ss-item .ss-name .hl { color: ' + (isDark ? '#f0c040' : '#d4380d') + '; }' +
         '.ss-item .ss-pinyin { font-size: 11px; color: ' + (isDark ? '#666' : '#bbb') + '; font-family: monospace; }' +
         '.ss-item .ss-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: ' + (isDark ? '#2a2a3e' : '#f0f0f5') + '; color: ' + (isDark ? '#999' : '#888') + '; }' +
