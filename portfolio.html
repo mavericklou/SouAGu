@@ -24,6 +24,7 @@ h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
 #refreshBtn:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
 table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 th, td { padding: 9px 8px; text-align: right; font-size: 13px; }
+td:first-child { text-align: left; white-space: nowrap; }
 th { background: #fafafa; font-weight: 500; color: #666; text-align: right; white-space: nowrap; }
 td:first-child, th:first-child { text-align: left; }
 td .ac-code { color: #999; font-size: 11px; }
@@ -382,11 +383,28 @@ tr:last-child { border-bottom: none; }
   document.getElementById('addBtn').addEventListener('click', addStock);
   document.getElementById('refreshBtn').addEventListener('click', refreshAll);
 
+  /* -------- 判断 A 股开市时间（北京时间） -------- */
+  function isMarketOpen() {
+    var now = new Date();
+    // 转成北京时间（UTC+8）
+    var bj = new Date(+now + now.getTimezoneOffset() * 60000 + 8 * 3600000);
+    var h = bj.getUTCHours();
+    var m = bj.getUTCMinutes();
+    // UTC 月份处理：getUTCMonth 0-11
+    var dow = bj.getUTCDay(); // 0=周日, 6=周六
+    var min = h * 60 + m;
+    if (dow === 0 || dow === 6) return false; // 周末
+    // 9:30-11:30 或 13:00-15:00
+    return (min >= 570 && min < 690) || (min >= 780 && min < 900);
+  }
+
   /* -------- Init -------- */
   render();
   refreshPrices().then(function() { render(); });
   setInterval(function() {
-    refreshPrices().then(function() { render(); });
+    if (isMarketOpen()) {
+      refreshPrices().then(function() { render(); });
+    }
   }, 30000);
 })();
 
