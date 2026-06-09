@@ -210,6 +210,21 @@ tr:last-child { border-bottom: none; }
         <span class="suffix">万</span>
       </div>
     </div>
+    <div style="border-top:1px solid #eee;margin:12px 0 14px"></div>
+    <div class="settings-row">
+      <label>股票最低佣金</label>
+      <div style="display:flex;align-items:center">
+        <input type="number" id="stockMin" step="0.1" min="0">
+        <span class="suffix">元</span>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>ETF 最低佣金</label>
+      <div style="display:flex;align-items:center">
+        <input type="number" id="etfMin" step="0.1" min="0">
+        <span class="suffix">元</span>
+      </div>
+    </div>
     <div class="settings-actions">
       <button class="btn-cancel" onclick="closeSettings()">取消</button>
       <button class="btn-save" id="settingsSaveBtn">保存</button>
@@ -282,15 +297,17 @@ tr:last-child { border-bottom: none; }
   /* -------- 费率设置 -------- */
   var SETTINGS_KEY = 'portfolio_fee_settings';
   function defaultSettings() {
-    return { stockRate: 1, etfRate: 1 };
+    return { stockRate: 1, etfRate: 1, stockMin: 5, etfMin: 0.5 };
   }
   function loadSettings() {
     try {
       var s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
       if (!s) return defaultSettings();
-      // 迁移旧数据（原存为小数0.00035 → 改为万分之3.5）
+      // 迁移旧数据
       if (s.stockRate < 1) s.stockRate = Math.round(s.stockRate * 10000 * 10) / 10;
       if (s.etfRate < 1) s.etfRate = Math.round(s.etfRate * 10000 * 10) / 10;
+      if (s.stockMin === undefined) s.stockMin = 5;
+      if (s.etfMin === undefined) s.etfMin = 0.5;
       return s;
     } catch(e) { return defaultSettings(); }
   }
@@ -301,6 +318,8 @@ tr:last-child { border-bottom: none; }
     var s = loadSettings();
     document.getElementById('stockRate').value = s.stockRate;
     document.getElementById('etfRate').value = s.etfRate;
+    document.getElementById('stockMin').value = s.stockMin;
+    document.getElementById('etfMin').value = s.etfMin;
     document.getElementById('settingsOverlay').classList.add('show');
   }
   function closeSettings() {
@@ -328,8 +347,9 @@ tr:last-child { border-bottom: none; }
     function getFees(code, costVal, mv) {
       var isEtf = code.charAt(0) === '5' || code.indexOf('159') === 0 || code.indexOf('16') === 0;
       var rate = (isEtf ? settings.etfRate : settings.stockRate) / 10000;
-      var buyFee = costVal * rate;
-      var sellFee = mv * rate;
+      var minFee = isEtf ? settings.etfMin : settings.stockMin;
+      var buyFee = Math.max(costVal * rate, minFee);
+      var sellFee = Math.max(mv * rate, minFee);
       var stampDuty = isEtf ? 0 : mv * 0.0005;
       return { buyFee: buyFee, sellFee: sellFee, stampDuty: stampDuty, netVal: mv - sellFee - stampDuty, costWithFees: costVal + buyFee };
     }
@@ -556,8 +576,10 @@ tr:last-child { border-bottom: none; }
   document.getElementById('settingsSaveBtn').addEventListener('click', function() {
     var stockRate = parseFloat(document.getElementById('stockRate').value);
     var etfRate = parseFloat(document.getElementById('etfRate').value);
-    if (isNaN(stockRate) || isNaN(etfRate) || stockRate < 0 || etfRate < 0) return;
-    saveSettings({ stockRate: stockRate, etfRate: etfRate });
+    var stockMin = parseFloat(document.getElementById('stockMin').value);
+    var etfMin = parseFloat(document.getElementById('etfMin').value);
+    if (isNaN(stockRate) || isNaN(etfRate) || isNaN(stockMin) || isNaN(etfMin) || stockRate < 0 || etfRate < 0 || stockMin < 0 || etfMin < 0) return;
+    saveSettings({ stockRate: stockRate, etfRate: etfRate, stockMin: stockMin, etfMin: etfMin });
     closeSettings();
     render();
   });
