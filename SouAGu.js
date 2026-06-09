@@ -431,8 +431,8 @@
           }
         }
 
-        var badge = code.charAt(0) === '6' || code.charAt(0) === '9' ? 'SH' :
-                    code.charAt(0) === '0' || code.charAt(0) === '3' ? 'SZ' : 'BJ';
+        var badge = code.charAt(0) === '6' || code.charAt(0) === '5' ? 'SH' :
+                    code.charAt(0) === '0' || code.charAt(0) === '3' || code.charAt(0) === '1' ? 'SZ' : 'BJ';
 
         html += '<div class="ss-item" data-code="' + code + '">' +
           '<span class="ss-code">' + code + '</span>' +
