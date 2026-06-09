@@ -199,15 +199,15 @@ tr:last-child { border-bottom: none; }
     <div class="settings-row">
       <label>股票佣金费率</label>
       <div style="display:flex;align-items:center">
-        <input type="number" id="stockRate" step="0.00001" min="0" max="0.01">
-        <span class="suffix"></span>
+        <input type="number" id="stockRate" step="0.1" min="0" max="30">
+        <span class="suffix">万</span>
       </div>
     </div>
     <div class="settings-row">
       <label>ETF 佣金费率</label>
       <div style="display:flex;align-items:center">
-        <input type="number" id="etfRate" step="0.00001" min="0" max="0.01">
-        <span class="suffix"></span>
+        <input type="number" id="etfRate" step="0.1" min="0" max="30">
+        <span class="suffix">万</span>
       </div>
     </div>
     <div class="settings-actions">
@@ -282,10 +282,17 @@ tr:last-child { border-bottom: none; }
   /* -------- 费率设置 -------- */
   var SETTINGS_KEY = 'portfolio_fee_settings';
   function defaultSettings() {
-    return { stockRate: 0.00035, etfRate: 0.00008 };
+    return { stockRate: 1, etfRate: 1 };
   }
   function loadSettings() {
-    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || defaultSettings(); } catch(e) { return defaultSettings(); }
+    try {
+      var s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+      if (!s) return defaultSettings();
+      // 迁移旧数据（原存为小数0.00035 → 改为万分之3.5）
+      if (s.stockRate < 1) s.stockRate = Math.round(s.stockRate * 10000 * 10) / 10;
+      if (s.etfRate < 1) s.etfRate = Math.round(s.etfRate * 10000 * 10) / 10;
+      return s;
+    } catch(e) { return defaultSettings(); }
   }
   function saveSettings(s) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
@@ -320,7 +327,7 @@ tr:last-child { border-bottom: none; }
     var settings = loadSettings();
     function getFees(code, costVal, mv) {
       var isEtf = code.charAt(0) === '5' || code.indexOf('159') === 0 || code.indexOf('16') === 0;
-      var rate = isEtf ? settings.etfRate : settings.stockRate;
+      var rate = (isEtf ? settings.etfRate : settings.stockRate) / 10000;
       var buyFee = costVal * rate;
       var sellFee = mv * rate;
       var stampDuty = isEtf ? 0 : mv * 0.0005;
