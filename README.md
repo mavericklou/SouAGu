@@ -17,8 +17,8 @@
 
 ```html
 <!-- 1. 引入数据 + 组件 -->
-<script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@latest/stocks-data.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@latest/SouAGu.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.5/stocks-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.5/SouAGu.js"></script>
 
 <!-- 2. 放一个容器 -->
 <div id="search"></div>
@@ -45,7 +45,7 @@
 
 ```html
 <script type="module">
-  import { SouAGu } from 'https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@latest/SouAGu.js';
+  import { SouAGu } from 'https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.5/SouAGu.js';
   const ss = new SouAGu('#search');
   await ss.loadData('./stocks.json');
   ss.onSelect(s => console.log(s.n, s.c));
