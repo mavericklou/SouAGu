@@ -645,12 +645,10 @@ tr:last-child { border-bottom: none; }
   /* -------- 判断 A 股开市时间（北京时间） -------- */
   function isMarketOpen() {
     var now = new Date();
-    // 转成北京时间（UTC+8）
-    var bj = new Date(+now + now.getTimezoneOffset() * 60000 + 8 * 3600000);
-    var h = bj.getUTCHours();
-    var m = bj.getUTCMinutes();
-    // UTC 月份处理：getUTCMonth 0-11
-    var dow = bj.getUTCDay(); // 0=周日, 6=周六
+    // 用 UTC 小时 + 8 得到北京时间（不受本地时区影响）
+    var h = now.getUTCHours() + 8;
+    var m = now.getUTCMinutes();
+    var dow = now.getUTCDay(); // 0=周日, 6=周六
     var min = h * 60 + m;
     if (dow === 0 || dow === 6) return false; // 周末
     // 9:30-11:30 或 13:00-15:00
