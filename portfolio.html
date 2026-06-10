@@ -112,7 +112,6 @@ tr:last-child { border-bottom: none; }
 }
 #settingsPageBtn:hover { background: rgba(0,0,0,0.08); color: #333; }
 .table-actions { display: flex; gap: 4px; align-items: center; }
-caption { caption-side: top; padding: 0 0 6px; text-align: right; }
 
 /* -------- 遮罩层 / 弹窗 -------- */
 #installOverlay {
@@ -165,7 +164,13 @@ caption { caption-side: top; padding: 0 0 6px; text-align: right; }
   </div>
 </div>
 
-<h1>📊 持仓助手</h1>
+<div style="display:flex;align-items:center;justify-content:space-between">
+  <h1>📊 持仓助手</h1>
+  <div class="table-actions">
+    <button id="installBtn" title="添加到桌面" aria-label="添加到桌面">📲</button>
+    <button id="settingsPageBtn" title="费率设置">设置</button>
+  </div>
+</div>
 
 <div class="form-row">
   <div id="stockSearchContainer"></div>
@@ -221,12 +226,6 @@ caption { caption-side: top; padding: 0 0 6px; text-align: right; }
 </div>
 
 <table>
-  <caption>
-    <div class="table-actions">
-      <button id="installBtn" title="添加到桌面" aria-label="添加到桌面">📲</button>
-      <button id="settingsPageBtn" title="费率设置">设置</button>
-    </div>
-  </caption>
   <thead>
     <tr>
       <th data-col="name" class="sortable">股票 <span class="si"></span></th>
