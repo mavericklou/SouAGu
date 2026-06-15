@@ -728,6 +728,8 @@ tr:last-child { border-bottom: none; }
       document.getElementById('status').textContent = '❌ 导入失败：' + e.message;
     }
   }
+  // 暴露给全局扫码函数调用
+  window.doImport = doImport;
 
   // 页面加载时检测 hash 是否含导入数据
   (function() {
