@@ -245,6 +245,22 @@ tr:last-child { border-bottom: none; }
   </div>
 </div>
 
+<!-- -------- 导入确认弹窗 -------- -->
+<div id="importConfirmOverlay" class="export-overlay">
+  <div class="export-box" style="max-width:360px;text-align:center">
+    <h3>📥 确认导入</h3>
+    <p style="font-size:14px;color:#333;margin:16px 0">
+      将导入 <strong id="importConfirmCount">0</strong> 条持仓数据
+    </p>
+    <p id="importConfirmExtra" style="font-size:13px;color:#999;margin:0 0 16px;display:none">（含费率设置）</p>
+    <p style="font-size:13px;color:#999;margin:0 0 20px">当前持仓将被覆盖，确定吗？</p>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button id="importConfirmCancel" style="padding:10px 24px;background:#f0f0f0;color:#666;border:none;border-radius:8px;font-size:14px;cursor:pointer">取消</button>
+      <button id="importConfirmOk" style="padding:10px 24px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer">确定导入</button>
+    </div>
+  </div>
+</div>
+
 <div style="display:flex;align-items:center;justify-content:space-between">
   <h1>📊 持仓助手</h1>
   <div class="table-actions">
@@ -712,21 +728,31 @@ tr:last-child { border-bottom: none; }
           lastPrice: null, lastChangePct: null
         };
       });
-      var msg = '将导入 ' + list.length + ' 条持仓';
-      if (pack.s) msg += '（含费率设置）';
-      msg += '，当前持仓将被覆盖，确定？';
-      if (!confirm(msg)) return;
+      // 显示自定义确认弹窗
+      showImportConfirm(list, pack.s);
+    } catch (e) {
+      document.getElementById('status').textContent = '❌ 导入失败：' + e.message;
+    }
+  }
 
+  function showImportConfirm(list, settings) {
+    var overlay = document.getElementById('importConfirmOverlay');
+    document.getElementById('importConfirmCount').textContent = list.length;
+    document.getElementById('importConfirmExtra').style.display = settings ? 'block' : 'none';
+    overlay.classList.add('show');
+    // 绑定按钮
+    document.getElementById('importConfirmOk').onclick = function() {
+      overlay.classList.remove('show');
       saveList(list);
-      if (pack.s) saveSettings(pack.s);
-      window.location.hash = '';
+      if (settings) saveSettings(settings);
       document.getElementById('importOverlay').classList.remove('show');
       render();
       refreshPrices().then(function() { render(); });
       document.getElementById('status').textContent = '✅ 已导入 ' + list.length + ' 条';
-    } catch (e) {
-      document.getElementById('status').textContent = '❌ 导入失败：' + e.message;
-    }
+    };
+    document.getElementById('importConfirmCancel').onclick = function() {
+      overlay.classList.remove('show');
+    };
   }
   // 暴露给全局扫码函数调用
   window.doImport = doImport;
@@ -736,11 +762,17 @@ tr:last-child { border-bottom: none; }
     var h = window.location.hash;
     if (h && h.indexOf('#d=') === 0) {
       setTimeout(function() {
-        if (confirm('检测到导入数据，是否导入到当前设备？')) {
+        document.getElementById('importConfirmCount').textContent = '...';
+        document.getElementById('importConfirmExtra').style.display = 'none';
+        document.getElementById('importConfirmOverlay').classList.add('show');
+        document.getElementById('importConfirmOk').onclick = function() {
+          document.getElementById('importConfirmOverlay').classList.remove('show');
           doImport(window.location.href);
-        } else {
+        };
+        document.getElementById('importConfirmCancel').onclick = function() {
+          document.getElementById('importConfirmOverlay').classList.remove('show');
           window.location.hash = '';
-        }
+        };
       }, 300);
     }
   })();
