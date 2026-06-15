@@ -122,6 +122,20 @@ tr:last-child { border-bottom: none; }
 #settingsPageBtn:hover { background: rgba(0,0,0,0.08); color: #333; }
 .table-actions { display: flex; gap: 4px; align-items: center; }
 
+/* -------- 导出/导入弹窗 -------- */
+.export-overlay {
+  display: none; position: fixed; inset: 0; z-index: 99997;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+.export-overlay.show { display: flex; }
+.export-box {
+  background: #fff; border-radius: 16px; padding: 28px 24px 22px;
+  max-width: 400px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+  position: relative; animation: popIn .25s ease-out;
+}
+.export-box h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #1d1d1f; }
+
 /* -------- 遮罩层 / 弹窗 -------- */
 #installOverlay {
   display: none; position: fixed; inset: 0; z-index: 99999;
@@ -173,9 +187,41 @@ tr:last-child { border-bottom: none; }
   </div>
 </div>
 
+<!-- -------- 数据导出弹窗 -------- -->
+<div id="exportOverlay" class="export-overlay">
+  <div class="export-box">
+    <button class="close-x" onclick="closeExport()">&times;</button>
+    <h3>📤 导出持仓数据</h3>
+    <p style="font-size:13px;color:#666;margin:0 0 16px">扫码或复制链接到另一台设备导入</p>
+    <div id="qrcode" style="text-align:center;margin:0 auto 16px;min-height:200px;display:flex;align-items:center;justify-content:center">
+      <span style="color:#bbb;font-size:13px">生成中...</span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <input id="exportLink" type="text" readonly style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333;background:#fafafa">
+      <button id="copyLinkBtn" style="padding:8px 14px;background:#1a73e8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap">复制</button>
+    </div>
+  </div>
+</div>
+
+<!-- -------- 数据导入弹窗 -------- -->
+<div id="importOverlay" class="export-overlay">
+  <div class="export-box">
+    <button class="close-x" onclick="closeImport()">&times;</button>
+    <h3>📥 导入持仓数据</h3>
+    <p style="font-size:13px;color:#666;margin:0 0 16px">粘贴从另一台设备导出的链接</p>
+    <textarea id="importInput" placeholder="粘贴完整的分享链接..." style="width:100%;height:80px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:none;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button onclick="closeImport()" style="padding:8px 20px;background:#f0f0f0;color:#666;border:none;border-radius:8px;font-size:14px;cursor:pointer">取消</button>
+      <button id="confirmImportBtn" disabled style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer">导入</button>
+    </div>
+  </div>
+</div>
+
 <div style="display:flex;align-items:center;justify-content:space-between">
   <h1>📊 持仓助手</h1>
   <div class="table-actions">
+    <button id="exportBtn" title="导出持仓数据">📤</button>
+    <button id="importBtn" title="导入持仓数据">📥</button>
     <button id="settingsPageBtn" title="费率设置">设置</button>
     <button id="installBtn" title="添加到桌面" aria-label="添加到桌面">📲</button>
   </div>
@@ -250,6 +296,10 @@ tr:last-child { border-bottom: none; }
 </table>
 
 <div class="empty" id="empty">在搜索框输入股票开始添加</div>
+
+<!-- 数据压缩 + QR码生成 -->
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
 
 <!-- 通过 jsDelivr CDN 加载（无需下载，双击即可用） -->
 <script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.5/stocks-data.js"></script>
@@ -543,9 +593,124 @@ tr:last-child { border-bottom: none; }
     render();
   }
 
+  /* -------- 按钮绑定 -------- */
+  document.getElementById('addBtn').addEventListener('click', addStock);
+  document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+
   function refreshAll() {
     refreshPrices().then(function() { render(); });
   }
+
+  /* -------- 导出/导入 -------- */
+  document.getElementById('exportBtn').addEventListener('click', function() {
+    if (typeof LZString === 'undefined' || typeof QRCode === 'undefined') {
+      document.getElementById('status').textContent = '⏳ 库加载中，请稍后...';
+      return;
+    }
+    openExport();
+  });
+  document.getElementById('importBtn').addEventListener('click', function() {
+    document.getElementById('importInput').value = '';
+    document.getElementById('confirmImportBtn').disabled = true;
+    document.getElementById('importOverlay').classList.add('show');
+  });
+  document.getElementById('copyLinkBtn').addEventListener('click', function() {
+    var input = document.getElementById('exportLink');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(input.value).then(function() {
+      document.getElementById('copyLinkBtn').textContent = '✅ 已复制';
+      setTimeout(function() { document.getElementById('copyLinkBtn').textContent = '复制'; }, 2000);
+    });
+  });
+  document.getElementById('importInput').addEventListener('input', function() {
+    var val = this.value.trim();
+    document.getElementById('confirmImportBtn').disabled = !(val.indexOf('#d=') > -1);
+  });
+  document.getElementById('confirmImportBtn').addEventListener('click', function() {
+    var val = document.getElementById('importInput').value.trim();
+    doImport(val);
+  });
+
+  /* -------- 导出/导入 核心逻辑 -------- */
+  function openExport() {
+    var list = loadList();
+    if (list.length === 0) {
+      document.getElementById('status').textContent = '⚠️ 没有持仓数据可导出';
+      return;
+    }
+    var clean = list.map(function(s) {
+      return { c: s.code, n: s.name, q: s.qty, p: s.cost, t: s.createdAt };
+    });
+    var settings = loadSettings();
+    var pack = { v: 1, h: clean, s: settings };
+    var json = JSON.stringify(pack);
+    var compressed = LZString.compressToEncodedURIComponent(json);
+    var base = window.location.href.split('#')[0];
+    var url = base + '#d=' + compressed;
+
+    document.getElementById('exportLink').value = url;
+    document.getElementById('exportOverlay').classList.add('show');
+
+    var qr = document.getElementById('qrcode');
+    qr.innerHTML = '';
+    new QRCode(qr, {
+      text: url,
+      width: 220,
+      height: 220,
+      colorDark: '#1a1a2e',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  }
+
+  function doImport(url) {
+    try {
+      var hash = url.split('#d=')[1];
+      if (!hash) throw new Error('链接中未找到数据');
+      var json = LZString.decompressFromEncodedURIComponent(hash);
+      if (!json) throw new Error('数据解压失败');
+      var pack = JSON.parse(json);
+      if (!pack.h || !Array.isArray(pack.h)) throw new Error('数据格式错误');
+
+      var list = pack.h.map(function(s) {
+        return {
+          code: s.c, name: s.n, qty: s.q, cost: s.p,
+          createdAt: s.t || new Date().toISOString(),
+          id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+          lastPrice: null, lastChangePct: null
+        };
+      });
+      var msg = '将导入 ' + list.length + ' 条持仓';
+      if (pack.s) msg += '（含费率设置）';
+      msg += '，当前持仓将被覆盖，确定？';
+      if (!confirm(msg)) return;
+
+      saveList(list);
+      if (pack.s) saveSettings(pack.s);
+      window.location.hash = '';
+      document.getElementById('importOverlay').classList.remove('show');
+      render();
+      refreshPrices().then(function() { render(); });
+      document.getElementById('status').textContent = '✅ 已导入 ' + list.length + ' 条';
+    } catch (e) {
+      document.getElementById('status').textContent = '❌ 导入失败：' + e.message;
+    }
+  }
+
+  // 页面加载时检测 hash 是否含导入数据
+  (function() {
+    var h = window.location.hash;
+    if (h && h.indexOf('#d=') === 0) {
+      setTimeout(function() {
+        if (confirm('检测到导入数据，是否导入到当前设备？')) {
+          doImport(window.location.href);
+        } else {
+          window.location.hash = '';
+        }
+      }, 300);
+    }
+  })();
 
   /* -------- Price fetch via Tencent HTTPS API -------- */
   function refreshPrices() {
@@ -746,6 +911,12 @@ function closeInstallOverlay() {
 }
 function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('show');
+}
+function closeExport() {
+  document.getElementById('exportOverlay').classList.remove('show');
+}
+function closeImport() {
+  document.getElementById('importOverlay').classList.remove('show');
 }
 </script>
 
