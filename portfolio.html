@@ -113,13 +113,13 @@ tr:last-child { border-bottom: none; }
 #installBtn:hover { background: rgba(26,115,232,0.22); transform: scale(1.08); }
 #installBtn:active { transform: scale(0.94); }
 #installBtn.hidden { display: none; }
-#settingsPageBtn {
+#exportBtn, #importBtn, #settingsPageBtn {
   height: 32px; padding: 0 10px; border-radius: 6px;
   border: none; background: rgba(0,0,0,0.04); color: #666;
   font-size: 12px; cursor: pointer; transition: background .15s;
   display: flex; align-items: center;
 }
-#settingsPageBtn:hover { background: rgba(0,0,0,0.08); color: #333; }
+#exportBtn:hover, #importBtn:hover, #settingsPageBtn:hover { background: rgba(0,0,0,0.08); color: #333; }
 .table-actions { display: flex; gap: 4px; align-items: center; }
 
 /* -------- 导出/导入弹窗 -------- */
@@ -220,8 +220,8 @@ tr:last-child { border-bottom: none; }
 <div style="display:flex;align-items:center;justify-content:space-between">
   <h1>📊 持仓助手</h1>
   <div class="table-actions">
-    <button id="exportBtn" title="导出持仓数据">📤</button>
-    <button id="importBtn" title="导入持仓数据">📥</button>
+    <button id="exportBtn" title="导出持仓数据">导出</button>
+    <button id="importBtn" title="导入持仓数据">导入</button>
     <button id="settingsPageBtn" title="费率设置">设置</button>
     <button id="installBtn" title="添加到桌面" aria-label="添加到桌面">📲</button>
   </div>
