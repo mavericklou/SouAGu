@@ -135,6 +135,13 @@ tr:last-child { border-bottom: none; }
   position: relative; animation: popIn .25s ease-out;
 }
 .export-box h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #1d1d1f; }
+.import-tab {
+  padding: 8px 16px; font-size: 13px; cursor: pointer; color: #999;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; user-select: none;
+  transition: color .15s, border-color .15s;
+}
+.import-tab:hover { color: #666; }
+.import-tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
 
 /* -------- 遮罩层 / 弹窗 -------- */
 #installOverlay {
@@ -206,13 +213,33 @@ tr:last-child { border-bottom: none; }
 <!-- -------- 数据导入弹窗 -------- -->
 <div id="importOverlay" class="export-overlay">
   <div class="export-box">
-    <button class="close-x" onclick="closeImport()">&times;</button>
+    <button class="close-x" onclick="stopScanner();closeImport()">&times;</button>
     <h3>📥 导入持仓数据</h3>
-    <p style="font-size:13px;color:#666;margin:0 0 16px">粘贴从另一台设备导出的链接</p>
-    <textarea id="importInput" placeholder="粘贴完整的分享链接..." style="width:100%;height:80px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:none;box-sizing:border-box"></textarea>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-      <button onclick="closeImport()" style="padding:8px 20px;background:#f0f0f0;color:#666;border:none;border-radius:8px;font-size:14px;cursor:pointer">取消</button>
-      <button id="confirmImportBtn" disabled style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer">导入</button>
+    <!-- 选项卡：粘贴 / 扫码 -->
+    <div style="display:flex;gap:0;margin:12px 0;border-bottom:1px solid #eee">
+      <div id="importTabPaste" class="import-tab active" onclick="switchImportTab('paste')">✏️ 粘贴</div>
+      <div id="importTabScan" class="import-tab" onclick="switchImportTab('scan')">📷 扫码</div>
+    </div>
+    <!-- 粘贴面板 -->
+    <div id="importPanelPaste">
+      <textarea id="importInput" placeholder="粘贴完整的分享链接..." style="width:100%;height:80px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:none;box-sizing:border-box"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button onclick="closeImport()" style="padding:8px 20px;background:#f0f0f0;color:#666;border:none;border-radius:8px;font-size:14px;cursor:pointer">取消</button>
+        <button id="confirmImportBtn" disabled style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer">导入</button>
+      </div>
+    </div>
+    <!-- 扫码面板 -->
+    <div id="importPanelScan" style="display:none">
+      <div style="position:relative;width:100%;max-width:280px;margin:0 auto;border-radius:12px;overflow:hidden;background:#000">
+        <video id="scannerVideo" autoplay playsinline style="width:100%;display:block"></video>
+        <canvas id="scannerCanvas" style="display:none"></canvas>
+        <div id="scannerOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;border:3px solid rgba(26,115,232,0.4);border-radius:12px;pointer-events:none;box-shadow:inset 0 0 80px rgba(0,0,0,0.3)"></div>
+      </div>
+      <p id="scannerStatus" style="font-size:12px;color:#999;text-align:center;margin:8px 0 0">将二维码对准相机</p>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+        <button onclick="stopScanner()" style="padding:8px 20px;background:#f0f0f0;color:#666;border:none;border-radius:8px;font-size:14px;cursor:pointer">取消</button>
+        <button onclick="uploadPhoto()" style="padding:8px 20px;background:#fff;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer">📁 选照片</button>
+      </div>
     </div>
   </div>
 </div>
@@ -300,6 +327,7 @@ tr:last-child { border-bottom: none; }
 <!-- 数据压缩 + QR码生成 -->
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
 
 <!-- 通过 jsDelivr CDN 加载（无需下载，双击即可用） -->
 <script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.5/stocks-data.js"></script>
@@ -610,6 +638,8 @@ tr:last-child { border-bottom: none; }
     openExport();
   });
   document.getElementById('importBtn').addEventListener('click', function() {
+    // 重置为粘贴面板
+    switchImportTab('paste');
     document.getElementById('importInput').value = '';
     document.getElementById('confirmImportBtn').disabled = true;
     document.getElementById('importOverlay').classList.add('show');
@@ -916,7 +946,97 @@ function closeExport() {
   document.getElementById('exportOverlay').classList.remove('show');
 }
 function closeImport() {
+  stopScanner();
   document.getElementById('importOverlay').classList.remove('show');
+}
+/* -------- 扫码导入 -------- */
+var scannerStream = null;
+var scannerTimer = null;
+function switchImportTab(tab) {
+  document.getElementById('importTabPaste').className = 'import-tab' + (tab === 'paste' ? ' active' : '');
+  document.getElementById('importTabScan').className = 'import-tab' + (tab === 'scan' ? ' active' : '');
+  document.getElementById('importPanelPaste').style.display = tab === 'paste' ? 'block' : 'none';
+  document.getElementById('importPanelScan').style.display = tab === 'scan' ? 'block' : 'none';
+  if (tab === 'scan') startScanner();
+  else stopScanner();
+}
+function startScanner() {
+  stopScanner();
+  if (typeof jsQR === 'undefined') {
+    document.getElementById('scannerStatus').textContent = '⏳ 扫码库加载中...';
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(stream) {
+    scannerStream = stream;
+    var video = document.getElementById('scannerVideo');
+    video.srcObject = stream;
+    video.play();
+    scanFrame();
+  }).catch(function() {
+    document.getElementById('scannerStatus').textContent = '❌ 无法打开摄像头，试试选照片或粘贴';
+  });
+}
+function scanFrame() {
+  if (!scannerStream) return;
+  var video = document.getElementById('scannerVideo');
+  var canvas = document.getElementById('scannerCanvas');
+  if (video.readyState < 2) { scannerTimer = setTimeout(scanFrame, 500); return; }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  var ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  var code = jsQR(imageData.data, imageData.width, imageData.height);
+  if (code && code.data.indexOf('#d=') > -1) {
+    stopScanner();
+    document.getElementById('scannerStatus').textContent = '✅ 识别成功！';
+    doImport(code.data);
+    return;
+  }
+  scannerTimer = setTimeout(scanFrame, 400);
+}
+function stopScanner() {
+  if (scannerTimer) { clearTimeout(scannerTimer); scannerTimer = null; }
+  if (scannerStream) {
+    scannerStream.getTracks().forEach(function(t) { t.stop(); });
+    scannerStream = null;
+  }
+  var video = document.getElementById('scannerVideo');
+  if (video) video.srcObject = null;
+}
+function uploadPhoto() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (typeof jsQR !== 'undefined') {
+          var code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code && code.data.indexOf('#d=') > -1) {
+            document.getElementById('scannerStatus').textContent = '✅ 识别成功！';
+            doImport(code.data);
+          } else {
+            document.getElementById('scannerStatus').textContent = '❌ 未在图片中找到有效二维码';
+          }
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 }
 </script>
 
