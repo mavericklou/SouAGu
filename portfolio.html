@@ -80,6 +80,9 @@ tr { border-bottom: 1px solid #f0f0f0; }
 tr:last-child { border-bottom: none; }
 .del { cursor: pointer; color: #e74c3c; font-size: 16px; padding: 0 4px; opacity: 0.4; }
 .del:hover { opacity: 1; }
+.del.undo { color: #1a73e8; }
+tr.deleting td { opacity: 0.35; text-decoration: line-through; transition: opacity .3s; }
+tr.deleting .del { opacity: 0.7; }
 .up { color: #e74c3c; }
 .down { color: #27ae60; }
 .flat { color: #999; }
@@ -354,6 +357,7 @@ tr:last-child { border-bottom: none; }
   var selectedStock = null;
   var prices = {};
   var sortCol = null, sortDir = null; // null = 默认按时间倒序
+  var pendingDeletions = {}; // { indexOrCode: setTimeoutId }
 
   /* -------- SouAGu 组件 -------- */
   var ss = new SouAGu('#stockSearchContainer', {
@@ -459,17 +463,20 @@ tr:last-child { border-bottom: none; }
       return { buyFee: buyFee, sellFee: sellFee, stampDuty: stampDuty, netVal: mv - sellFee - stampDuty, costWithFees: costVal + buyFee };
     }
 
-    function buildRowData(name, code, qty, cost, price, changePct, mv, netVal, costWithFees, pl, delIdx, createdAt) {
+    function buildRowData(name, code, qty, cost, price, changePct, mv, netVal, costWithFees, pl, delIdx, createdAt, isPending) {
       var cls = price ? (pl > 0 ? 'up' : pl < 0 ? 'down' : 'flat') : '';
       var plPctVal = costWithFees ? ((netVal - costWithFees) / costWithFees * 100) : 0;
-      var html = '<tr>' +
+      var delIcon = isPending ? '↩' : '✕';
+      var delClass = isPending ? 'del undo' : 'del';
+      var rowClass = isPending ? ' class="deleting"' : '';
+      var html = '<tr' + rowClass + '>' +
         '<td>' + name + '<span class="ac-code"> ' + code + '</span></td>' +
         '<td>' + fmt0(qty) + '</td>' +
         '<td>' + fmt(cost) + '</td>' +
         '<td>' + (price ? fmt(price) + '<br><span class="' + (changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat') + '" style="font-size:11px">' + (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%</span>' : '<span class="flat">--</span>') + '</td>' +
         '<td>' + (price ? fmt(mv) : '<span class="flat">--</span>') + '</td>' +
         '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) + '<br><span style="font-size:11px">' + (plPctVal > 0 ? '+' : '') + plPctVal.toFixed(2) + '%</span>' : '--') + '</td>' +
-        '<td><span class="del" data-index="' + delIdx + '">✕</span></td>' +
+        '<td><span class="' + delClass + '" data-index="' + delIdx + '">' + delIcon + '</span></td>' +
       '</tr>';
       return { html: html, name: name, code: code, time: createdAt || '2026-01-01T00:00:00', qty: qty, cost: cost, price: price || 0, mv: mv, pl: pl };
     }
@@ -497,7 +504,7 @@ tr:last-child { border-bottom: none; }
         var f = getFees(code, costVal, mv);
         var pl = price ? (f.netVal - f.costWithFees) : 0;
         if (price) { totalCost += f.costWithFees; totalMv += mv; totalPl += pl; }
-        rowData.push(buildRowData(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, f.netVal, f.costWithFees, pl, code, grp.latestTime));
+        rowData.push(buildRowData(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, f.netVal, f.costWithFees, pl, code, grp.latestTime, pendingDeletions[code] !== undefined));
       }
     } else {
       for (var i = 0; i < list.length; i++) {
@@ -510,7 +517,7 @@ tr:last-child { border-bottom: none; }
         var f = getFees(s.code, costVal, mv);
         var pl = price ? (f.netVal - f.costWithFees) : 0;
         if (price) { totalCost += f.costWithFees; totalMv += mv; totalPl += pl; }
-        rowData.push(buildRowData(s.name, s.code, s.qty, s.cost, price, changePct, mv, f.netVal, f.costWithFees, pl, i, s.createdAt));
+        rowData.push(buildRowData(s.name, s.code, s.qty, s.cost, price, changePct, mv, f.netVal, f.costWithFees, pl, s.id, s.createdAt, pendingDeletions[s.id] !== undefined));
       }
     }
 
@@ -541,8 +548,7 @@ tr:last-child { border-bottom: none; }
 
     tbody.querySelectorAll('.del').forEach(function(el) {
       el.addEventListener('click', function() {
-        var val = el.dataset.index;
-        removeStock(merge ? val : parseInt(val));
+        removeStock(el.dataset.index);
       });
     });
 
@@ -623,15 +629,26 @@ tr:last-child { border-bottom: none; }
   }
 
   function removeStock(id) {
-    var list = loadList();
-    var merge = document.getElementById('mergeCb').checked;
-    if (merge && typeof id === 'string') {
-      // 合并模式：按代码删除所有条目
-      list = list.filter(function(s) { return s.code !== id; });
-    } else {
-      list.splice(id, 1);
+    // 软删除：标记为待删除，5分钟后真正删除
+    if (pendingDeletions[id] !== undefined) {
+      // 已标记为待删除 → 撤销
+      clearTimeout(pendingDeletions[id]);
+      delete pendingDeletions[id];
+      render();
+      return;
     }
-    saveList(list);
+    pendingDeletions[id] = setTimeout(function() {
+      // 真正删除
+      var list = loadList();
+      var merge = document.getElementById('mergeCb').checked;
+      // merge 模式 id=股票代码，否则 id=条目的唯一标识
+      list = merge
+        ? list.filter(function(s) { return s.code !== id; })
+        : list.filter(function(s) { return s.id !== id; });
+      saveList(list);
+      delete pendingDeletions[id];
+      render();
+    }, 5 * 60 * 1000);
     render();
   }
 
