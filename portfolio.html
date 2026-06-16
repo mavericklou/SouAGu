@@ -64,11 +64,6 @@ h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
 .settings-actions .btn-cancel:hover { background: #e5e5e5; }
 .settings-actions .btn-save { background: #1a73e8; color: #fff; }
 .settings-actions .btn-save:hover { background: #1557b0; }
-#settingsBox .close-x {
-  position: absolute; top: 10px; right: 14px; border: none; background: none;
-  font-size: 20px; color: #999; cursor: pointer;
-}
-#settingsBox .close-x:hover { color: #333; }
 
 table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 th, td { padding: 9px 8px; text-align: right; font-size: 13px; }
@@ -135,6 +130,13 @@ tr:last-child { border-bottom: none; }
   position: relative; animation: popIn .25s ease-out;
 }
 .export-box h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #1d1d1f; }
+/* 关闭按钮 — 统一右上角 */
+.close-x {
+  position: absolute; top: 10px; right: 14px; border: none; background: none;
+  font-size: 22px; color: #bbb; cursor: pointer; line-height: 1;
+  padding: 4px 8px; border-radius: 6px; transition: background .15s, color .15s;
+}
+.close-x:hover { background: rgba(0,0,0,0.06); color: #333; }
 #qrcode canvas, #qrcode img { border-radius: 8px; background: #fff; padding: 12px; }
 .export-box .import-tab {
   padding: 8px 16px; font-size: 13px; cursor: pointer; color: #999;
@@ -175,11 +177,6 @@ tr:last-child { border-bottom: none; }
   background: #1a73e8; color: #fff; font-size: 14px; cursor: pointer;
 }
 #installBox .close-btn:hover { background: #1557b0; }
-#installBox .close-x {
-  position: absolute; top: 10px; right: 14px; border: none; background: none;
-  font-size: 20px; color: #999; cursor: pointer;
-}
-#installBox .close-x:hover { color: #333; }
 </style>
 </head>
 <body>
@@ -198,7 +195,7 @@ tr:last-child { border-bottom: none; }
 <!-- -------- 数据导出弹窗 -------- -->
 <div id="exportOverlay" class="export-overlay">
   <div class="export-box">
-    <button class="close-x" onclick="closeExport()">&times;</button>
+    <button class="close-x" onclick="closeExport()">✕</button>
     <h3>📤 导出持仓数据</h3>
     <p style="font-size:13px;color:#666;margin:0 0 16px">扫码或复制链接到另一台设备导入</p>
     <div id="qrcode" style="text-align:center;margin:0 auto 16px;min-height:280px;display:flex;align-items:center;justify-content:center">
@@ -214,12 +211,12 @@ tr:last-child { border-bottom: none; }
 <!-- -------- 数据导入弹窗 -------- -->
 <div id="importOverlay" class="export-overlay">
   <div class="export-box">
-    <button class="close-x" onclick="stopScanner();closeImport()">&times;</button>
+    <button class="close-x" onclick="stopScanner();closeImport()">✕</button>
     <h3>📥 导入持仓数据</h3>
     <!-- 选项卡：粘贴 / 扫码 -->
     <div style="display:flex;gap:0;margin:12px 0;border-bottom:1px solid #eee">
-      <div id="importTabPaste" class="import-tab active" onclick="switchImportTab('paste')">✏️ 粘贴</div>
-      <div id="importTabScan" class="import-tab" onclick="switchImportTab('scan')">📷 扫码</div>
+      <div id="importTabPaste" class="import-tab active" onclick="switchImportTab('paste')">粘贴</div>
+      <div id="importTabScan" class="import-tab" onclick="switchImportTab('scan')">扫码</div>
     </div>
     <!-- 粘贴面板 -->
     <div id="importPanelPaste">
