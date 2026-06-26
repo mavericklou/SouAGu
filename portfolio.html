@@ -130,7 +130,7 @@ tr.deleting .del { opacity: 0.7; }
 .export-overlay.show { display: flex; }
 .export-box {
   background: #fff; border-radius: 16px; padding: 28px 24px 22px;
-  max-width: 440px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+  max-width: 500px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.2);
   position: relative; animation: popIn .25s ease-out;
 }
 .export-box h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #1d1d1f; }
@@ -719,10 +719,10 @@ tr.deleting .del { opacity: 0.7; }
       return;
     }
     var clean = list.map(function(s) {
-      return { c: s.code, n: s.name, q: s.qty, p: s.cost, t: s.createdAt };
+      return { c: s.code, q: s.qty, p: s.cost };
     });
     var settings = loadSettings();
-    var pack = { v: 1, h: clean, s: settings };
+    var pack = { v: 2, h: clean, s: settings };
     var json = JSON.stringify(pack);
     var compressed = LZString.compressToEncodedURIComponent(json);
     var base = window.location.href.split('#')[0];
@@ -735,12 +735,13 @@ tr.deleting .del { opacity: 0.7; }
     qr.innerHTML = '';
     new QRCode(qr, {
       text: url,
-      width: 280,
-      height: 280,
+      width: 360,
+      height: 360,
       colorDark: '#1a1a2e',
       colorLight: '#ffffff',
       correctLevel: QRCode.CorrectLevel.L
     });
+    // 放大 QR 码方便扫码
   }
 
   function doImport(url) {
@@ -753,9 +754,15 @@ tr.deleting .del { opacity: 0.7; }
       if (!pack.h || !Array.isArray(pack.h)) throw new Error('数据格式错误');
 
       var list = pack.h.map(function(s) {
+        // 从本地数据查找名称
+        var name = s.c;
+        var allData = ss.getData();
+        for (var j = 0; j < allData.length; j++) {
+          if (allData[j].c === s.c) { name = allData[j].n; break; }
+        }
         return {
-          code: s.c, name: s.n, qty: s.q, cost: s.p,
-          createdAt: s.t || new Date().toISOString(),
+          code: s.c, name: name, qty: s.q, cost: s.p,
+          createdAt: new Date().toISOString(),
           id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
           lastPrice: null, lastChangePct: null
         };
