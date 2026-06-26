@@ -378,6 +378,23 @@ tr.deleting .del { opacity: 0.7; }
     document.getElementById('qty').focus();
   });
 
+  // 输入框失焦时，唯一代码自动填充
+  document.querySelector('#stockSearchContainer .ss-input').addEventListener('blur', function() {
+    var self = this;
+    setTimeout(function() {
+      var val = self.value.trim();
+      // 如果还没被选中（不含括号），且唯一匹配，自动填充
+      if (val && val.indexOf('(') === -1) {
+        var results = ss.search(val);
+        if (results.length === 1) {
+          selectedStock = results[0];
+          document.getElementById('addBtn').disabled = false;
+          self.value = results[0].n + ' (' + results[0].c + ')';
+        }
+      }
+    }, 200);
+  });
+
   /* -------- Keydown 处理 -------- */
   document.getElementById('qty').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addStock();
@@ -619,6 +636,7 @@ tr.deleting .del { opacity: 0.7; }
     saveList(list);
 
     ss.clear();
+    ss.focus();
     document.getElementById('qty').value = '';
     document.getElementById('cost').value = '';
     document.getElementById('addBtn').disabled = true;
