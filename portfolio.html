@@ -302,19 +302,17 @@ tr.deleting .del { opacity: 0.7; }
 <div class="summary" id="summary"></div>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-  <div class="status" id="status">加载中...</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="status" id="status">加载中...</div>
+    <div class="filter-wrapper" style="width:160px">
+      <input id="filterInput" type="text" placeholder="股票代码筛选" autocomplete="off" maxlength="6">
+      <span id="filterClear" class="filter-clear" style="display:none">✕</span>
+    </div>
+  </div>
   <div class="merge-switch" id="mergeSwitch" title="合并相同股票">
     <div class="switch-track" id="switchTrack"><div class="switch-knob"></div></div>
     <span>合并相同</span>
     <input type="checkbox" id="mergeCb">
-  </div>
-</div>
-
-<!-- -------- 表格筛选 -------- -->
-<div class="filter-row">
-  <div class="filter-wrapper">
-    <input id="filterInput" type="text" placeholder="筛选股票代码，如 159928" autocomplete="off" maxlength="6">
-    <span id="filterClear" class="filter-clear" style="display:none">✕</span>
   </div>
 </div>
 
