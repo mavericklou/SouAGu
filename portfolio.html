@@ -102,6 +102,25 @@ tr.deleting .del { opacity: 0.7; }
   .summary { gap: 10px; font-size: 13px; }
 }
 
+/* -------- 表格筛选 -------- */
+.filter-row { margin-bottom: 8px; }
+.filter-wrapper {
+  position: relative; display: inline-flex; align-items: center; width: 220px;
+}
+.filter-wrapper input {
+  width: 100%; padding: 6px 28px 6px 10px; border: 1px solid #d0d5dd;
+  border-radius: 6px; font-size: 13px; outline: none; color: #333;
+  box-sizing: border-box;
+}
+.filter-wrapper input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.12); }
+.filter-wrapper input::placeholder { color: #bbb; font-size: 12px; }
+.filter-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  cursor: pointer; font-size: 14px; color: #999; line-height: 1; user-select: none;
+  padding: 2px;
+}
+.filter-clear:hover { color: #333; }
+
 /* -------- 表格右上角操作按钮 -------- */
 #installBtn {
   width: 32px; height: 32px; border-radius: 50%;
@@ -291,6 +310,14 @@ tr.deleting .del { opacity: 0.7; }
   </div>
 </div>
 
+<!-- -------- 表格筛选 -------- -->
+<div class="filter-row">
+  <div class="filter-wrapper">
+    <input id="filterInput" type="text" placeholder="筛选股票代码，如 159928" autocomplete="off" maxlength="6">
+    <span id="filterClear" class="filter-clear" style="display:none">✕</span>
+  </div>
+</div>
+
 <!-- 设置弹窗 -->
 <div id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
   <div id="settingsBox">
@@ -359,6 +386,7 @@ tr.deleting .del { opacity: 0.7; }
   var prices = {};
   var sortCol = null, sortDir = null; // null = 默认按时间倒序
   var pendingDeletions = {}; // { indexOrCode: setTimeoutId }
+  var filterCode = ''; // 表格筛选代码
 
   /* -------- SouAGu 组件 -------- */
   var ss = new SouAGu('#stockSearchContainer', {
@@ -454,6 +482,10 @@ tr.deleting .del { opacity: 0.7; }
 
   function render() {
     var list = loadList();
+    // 应用筛选
+    if (filterCode) {
+      list = list.filter(function(s) { return s.code.indexOf(filterCode) !== -1; });
+    }
     var tbody = document.getElementById('tbody');
     var empty = document.getElementById('empty');
     var summary = document.getElementById('summary');
@@ -709,6 +741,19 @@ tr.deleting .del { opacity: 0.7; }
   document.getElementById('confirmImportBtn').addEventListener('click', function() {
     var val = document.getElementById('importInput').value.trim();
     doImport(val);
+  });
+
+  /* -------- 表格筛选 -------- */
+  document.getElementById('filterInput').addEventListener('input', function() {
+    filterCode = this.value.trim();
+    document.getElementById('filterClear').style.display = filterCode ? 'block' : 'none';
+    render();
+  });
+  document.getElementById('filterClear').addEventListener('click', function() {
+    document.getElementById('filterInput').value = '';
+    filterCode = '';
+    document.getElementById('filterClear').style.display = 'none';
+    render();
   });
 
   /* -------- 导出/导入 核心逻辑 -------- */
