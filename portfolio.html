@@ -520,8 +520,8 @@ tr.deleting .del { opacity: 0.7; }
       var html = '<tr' + rowClass + '>' +
         '<td>' + name + '<span class="ac-code"> ' + code + '</span></td>' +
         '<td>' + fmt0(qty) + '</td>' +
-        '<td>' + fmt(cost) + '</td>' +
-        '<td>' + (price ? fmt(price) + '<br><span class="' + (changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat') + '" style="font-size:11px">' + (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%</span>' : '<span class="flat">--</span>') + '</td>' +
+        '<td>' + fmtPrice(code, cost) + '</td>' +
+        '<td>' + (price ? fmtPrice(code, price) + '<br><span class="' + (changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat') + '" style="font-size:11px">' + (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%</span>' : '<span class="flat">--</span>') + '</td>' +
         '<td>' + (price ? fmt(mv) : '<span class="flat">--</span>') + '</td>' +
         '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) + '<br><span style="font-size:11px">' + (plPctVal > 0 ? '+' : '') + plPctVal.toFixed(2) + '%</span>' : '--') + '</td>' +
         '<td><span class="' + delClass + '" data-index="' + delIdx + '">' + delIcon + '</span></td>' +
@@ -652,6 +652,11 @@ tr.deleting .del { opacity: 0.7; }
 
   function plPct(price, cost) { return cost ? ((price - cost) / cost * 100) : 0; }
   function fmt(n) { return n === undefined || n === null ? '--' : n.toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function fmtPrice(code, n) {
+    if (n === undefined || n === null) return '--';
+    var digits = (code && (code.indexOf('159') === 0 || code.indexOf('16') === 0 || code.indexOf('51') === 0 || code.indexOf('56') === 0 || code.indexOf('58') === 0)) ? 3 : 2;
+    return n.toLocaleString('zh-CN', {minimumFractionDigits:digits, maximumFractionDigits:digits});
+  }
   function fmt0(n) { return n === undefined || n === null ? '--' : n.toLocaleString('zh-CN', {minimumFractionDigits:0, maximumFractionDigits:0}); }
 
   function addStock() {
@@ -660,6 +665,10 @@ tr.deleting .del { opacity: 0.7; }
     var qty = parseFloat(document.getElementById('qty').value);
     var cost = parseFloat(document.getElementById('cost').value);
     if (!qty || !cost) return;
+    // ETF/LOF 成本保留3位小数
+    if (cost && s.c && (s.c.indexOf('159') === 0 || s.c.indexOf('16') === 0 || s.c.indexOf('51') === 0 || s.c.indexOf('56') === 0 || s.c.indexOf('58') === 0)) {
+      cost = Math.round(cost * 1000) / 1000;
+    }
 
     var list = loadList();
     list.push({ code: s.c, name: s.n, qty: qty, cost: cost, createdAt: new Date().toISOString(), lastPrice: null, lastChangePct: null });
