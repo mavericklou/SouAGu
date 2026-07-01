@@ -520,7 +520,7 @@ tr.deleting .del { opacity: 0.7; }
       var html = '<tr' + rowClass + '>' +
         '<td>' + name + '<span class="ac-code"> ' + code + '</span></td>' +
         '<td>' + fmt0(qty) + '</td>' +
-        '<td>' + fmtPrice(code, cost) + '</td>' +
+        '<td>' + fmtPrice(code, cost) + '<span class="ac-code" style="font-size:10px">' + (createdAt ? createdAt.slice(5, 10) : '') + '</span></td>' +
         '<td>' + (price ? fmtPrice(code, price) + '<br><span class="' + (changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat') + '" style="font-size:11px">' + (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%</span>' : '<span class="flat">--</span>') + '</td>' +
         '<td>' + (price ? fmt(mv) : '<span class="flat">--</span>') + '</td>' +
         '<td class="' + cls + '">' + (price ? (pl > 0 ? '+' : '') + fmt(pl) + '<br><span style="font-size:11px">' + (plPctVal > 0 ? '+' : '') + plPctVal.toFixed(2) + '%</span>' : '--') + '</td>' +
