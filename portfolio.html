@@ -120,6 +120,11 @@ tr.deleting .del { opacity: 0.7; }
   padding: 2px;
 }
 .filter-clear:hover { color: #333; }
+.filter-clear-fixed {
+  position: static; transform: none; font-size: 15px; padding: 4px 6px;
+  border-radius: 50%; background: rgba(0,0,0,0.05);
+}
+.filter-clear-fixed:hover { background: rgba(0,0,0,0.12); color: #333; }
 
 /* -------- 表格右上角操作按钮 -------- */
 #installBtn {
@@ -304,10 +309,8 @@ tr.deleting .del { opacity: 0.7; }
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
   <div style="display:flex;align-items:center;gap:12px">
     <div class="status" id="status">加载中...</div>
-    <div class="filter-wrapper" style="width:160px">
-      <input id="filterInput" type="text" placeholder="股票代码筛选" autocomplete="off" maxlength="6">
-      <span id="filterClear" class="filter-clear" style="display:none">✕</span>
-    </div>
+    <div id="filterSearchContainer" style="width:180px"></div>
+    <span id="filterClear" class="filter-clear filter-clear-fixed" title="清除筛选" style="display:none">✕</span>
   </div>
   <div class="merge-switch" id="mergeSwitch" title="合并相同股票">
     <div class="switch-track" id="switchTrack"><div class="switch-knob"></div></div>
@@ -751,16 +754,45 @@ tr.deleting .del { opacity: 0.7; }
   });
 
   /* -------- 表格筛选 -------- */
-  document.getElementById('filterInput').addEventListener('input', function() {
-    filterCode = this.value.trim();
-    document.getElementById('filterClear').style.display = filterCode ? 'block' : 'none';
+  var filterSS = new SouAGu('#filterSearchContainer', {
+    placeholder: '代码/名称/拼音',
+    width: '100%',
+    maxResults: 10,
+    zIndex: '99',
+    theme: 'light'
+  });
+  filterSS.setData(window.__STOCKS_DATA);
+  filterSS.onSelect(function(stock) {
+    filterCode = stock.c;
+    document.getElementById('filterClear').style.display = 'block';
     render();
   });
   document.getElementById('filterClear').addEventListener('click', function() {
-    document.getElementById('filterInput').value = '';
     filterCode = '';
+    filterSS.clear();
     document.getElementById('filterClear').style.display = 'none';
     render();
+  });
+  // 输入框失焦时，唯一代码自动填充并筛选
+  document.querySelector('#filterSearchContainer .ss-input').addEventListener('blur', function() {
+    var self = this;
+    setTimeout(function() {
+      var val = self.value.trim();
+      if (val && val.indexOf('(') === -1) {
+        var results = filterSS.search(val);
+        if (results.length === 1) {
+          filterCode = results[0].c;
+          document.getElementById('filterClear').style.display = 'block';
+          render();
+          self.value = results[0].n + ' (' + results[0].c + ')';
+        } else if (results.length === 0) {
+          // 无匹配时清除筛选
+          filterCode = '';
+          document.getElementById('filterClear').style.display = 'none';
+          render();
+        }
+      }
+    }, 200);
   });
 
   /* -------- 导出/导入 核心逻辑 -------- */
