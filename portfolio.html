@@ -458,6 +458,11 @@ tr.deleting .del { opacity: 0.7; }
 
   function render() {
     var list = loadList();
+    // 保险：筛选框已空但筛选状态残留时自动重置
+    var filterInput = document.querySelector('#filterSearchContainer .ss-input');
+    if (filterInput && !filterInput.value.trim() && filterCode) {
+      filterCode = '';
+    }
     // 应用筛选
     if (filterCode) {
       list = list.filter(function(s) { return s.code.indexOf(filterCode) !== -1; });
@@ -751,6 +756,13 @@ tr.deleting .del { opacity: 0.7; }
   document.querySelector('#filterSearchContainer .ss-clear').addEventListener('click', function() {
     filterCode = '';
     render();
+  });
+  // 手动删除字符清空时重置
+  document.querySelector('#filterSearchContainer .ss-input').addEventListener('input', function() {
+    if (!this.value.trim() && filterCode) {
+      filterCode = '';
+      render();
+    }
   });
   // 输入框失焦时，唯一代码自动填充并筛选
   document.querySelector('#filterSearchContainer .ss-input').addEventListener('blur', function() {
