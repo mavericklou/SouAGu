@@ -102,30 +102,6 @@ tr.deleting .del { opacity: 0.7; }
   .summary { gap: 10px; font-size: 13px; }
 }
 
-/* -------- 表格筛选 -------- */
-.filter-row { margin-bottom: 8px; }
-.filter-wrapper {
-  position: relative; display: inline-flex; align-items: center; width: 220px;
-}
-.filter-wrapper input {
-  width: 100%; padding: 6px 28px 6px 10px; border: 1px solid #d0d5dd;
-  border-radius: 6px; font-size: 13px; outline: none; color: #333;
-  box-sizing: border-box;
-}
-.filter-wrapper input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.12); }
-.filter-wrapper input::placeholder { color: #bbb; font-size: 12px; }
-.filter-clear {
-  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-  cursor: pointer; font-size: 14px; color: #999; line-height: 1; user-select: none;
-  padding: 2px;
-}
-.filter-clear:hover { color: #333; }
-.filter-clear-fixed {
-  position: static; transform: none; font-size: 15px; padding: 4px 6px;
-  border-radius: 50%; background: rgba(0,0,0,0.05);
-}
-.filter-clear-fixed:hover { background: rgba(0,0,0,0.12); color: #333; }
-
 /* -------- 表格右上角操作按钮 -------- */
 #installBtn {
   width: 32px; height: 32px; border-radius: 50%;
@@ -310,7 +286,6 @@ tr.deleting .del { opacity: 0.7; }
   <div style="display:flex;align-items:center;gap:12px">
     <div class="status" id="status">加载中...</div>
     <div id="filterSearchContainer" style="width:180px"></div>
-    <span id="filterClear" class="filter-clear filter-clear-fixed" title="清除筛选" style="display:none">✕</span>
   </div>
   <div class="merge-switch" id="mergeSwitch" title="合并相同股票">
     <div class="switch-track" id="switchTrack"><div class="switch-knob"></div></div>
@@ -764,14 +739,13 @@ tr.deleting .del { opacity: 0.7; }
   filterSS.setData(window.__STOCKS_DATA);
   filterSS.onSelect(function(stock) {
     filterCode = stock.c;
-    document.getElementById('filterClear').style.display = 'block';
     render();
   });
-  document.getElementById('filterClear').addEventListener('click', function() {
-    filterCode = '';
-    filterSS.clear();
-    document.getElementById('filterClear').style.display = 'none';
-    render();
+  filterSS.onInput(function(e) {
+    if (!e.query) {
+      filterCode = '';
+      render();
+    }
   });
   // 输入框失焦时，唯一代码自动填充并筛选
   document.querySelector('#filterSearchContainer .ss-input').addEventListener('blur', function() {
@@ -782,13 +756,11 @@ tr.deleting .del { opacity: 0.7; }
         var results = filterSS.search(val);
         if (results.length === 1) {
           filterCode = results[0].c;
-          document.getElementById('filterClear').style.display = 'block';
           render();
           self.value = results[0].n + ' (' + results[0].c + ')';
         } else if (results.length === 0) {
           // 无匹配时清除筛选
           filterCode = '';
-          document.getElementById('filterClear').style.display = 'none';
           render();
         }
       }
