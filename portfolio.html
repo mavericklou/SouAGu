@@ -747,6 +747,11 @@ tr.deleting .del { opacity: 0.7; }
       render();
     }
   });
+  // SouAGu 内置清除按钮点击时重置筛选
+  document.querySelector('#filterSearchContainer .ss-clear').addEventListener('click', function() {
+    filterCode = '';
+    render();
+  });
   // 输入框失焦时，唯一代码自动填充并筛选
   document.querySelector('#filterSearchContainer .ss-input').addEventListener('blur', function() {
     var self = this;
