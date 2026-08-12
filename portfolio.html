@@ -775,6 +775,9 @@ tr.deleting .del { opacity: 0.7; }
           filterCode = results[0].c;
           render();
           self.value = results[0].n + ' (' + results[0].c + ')';
+          // 隐藏下拉框
+          var dd = document.querySelector('#filterSearchContainer .ss-dropdown');
+          if (dd) dd.style.display = 'none';
         } else if (results.length === 0) {
           // 无匹配时清除筛选
           filterCode = '';
