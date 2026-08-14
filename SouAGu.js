@@ -167,7 +167,13 @@
       for (var i = 0; i < data.length; i++) {
         var s = data[i];
         if (s.c) this._insert(s.c, s);
-        if (s.i) this._insert(s.i.toUpperCase(), s);
+        if (s.i) {
+          // i 可能含多个拼音（逗号分隔，如 "STHW,HWSW"），逐个插入
+          var keys = s.i.split(',');
+          for (var k = 0; k < keys.length; k++) {
+            if (keys[k]) this._insert(keys[k].toUpperCase(), s);
+          }
+        }
       }
       this._indexBuilt = true;
     }
