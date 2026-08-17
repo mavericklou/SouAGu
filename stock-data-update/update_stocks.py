@@ -131,6 +131,7 @@ POLYPHONIC_FIX = {
     # 其他
     '000423': 'DEEJ',     # 东阿阿胶（"阿"读 ē）
     '600202': 'HKT',      # 哈空调（空调的"调"读 tiáo）
+    '603776': 'YAX',      # 永安行（共享单车，"行"读 xíng）
 }
 
 def apply_manual_fix(code, name):
