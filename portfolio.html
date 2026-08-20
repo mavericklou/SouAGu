@@ -94,13 +94,20 @@ tr.deleting .del { opacity: 0.7; }
 .empty { text-align: center; padding: 40px 0; color: #aaa; font-size: 14px; }
 #stockSearchContainer { flex: 2; min-width: 120px; }
 @media (max-width: 600px) {
-  body { padding: 12px; }
+  body { padding: 8px; }
   .form-row input { min-width: 45px; font-size: 13px; padding: 7px 8px; }
   #stockSearchContainer { min-width: 90px; }
   .form-row { gap: 4px; }
-  th, td { padding: 4px 3px; font-size: 11px; }
-  td:first-child { white-space: normal; word-break: break-all; }
-  th { white-space: normal; }
+  table { table-layout: fixed; width: 100%; }
+  th, td { padding: 5px 2px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  th:first-child, td:first-child { width: 20%; text-align: left; }
+  th:nth-child(2), td:nth-child(2) { width: 12%; }
+  th:nth-child(3), td:nth-child(3) { width: 12%; }
+  th:nth-child(4), td:nth-child(4) { width: 13%; }
+  th:nth-child(5), td:nth-child(5) { width: 19%; }
+  th:nth-child(6), td:nth-child(6) { width: 17%; }
+  th:nth-child(7), td:nth-child(7) { width: 7%; }
+  .del { font-size: 11px; padding: 0 1px; }
   .summary { gap: 10px; font-size: 13px; }
 }
 
@@ -330,7 +337,7 @@ tr.deleting .del { opacity: 0.7; }
   </div>
 </div>
 
-<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table>
+<table>
   <thead>
     <tr>
       <th data-col="name" class="sortable">股票 <span class="si"></span></th>
@@ -343,7 +350,7 @@ tr.deleting .del { opacity: 0.7; }
     </tr>
   </thead>
   <tbody id="tbody"></tbody>
-</table></div>
+</table>
 
 <div class="empty" id="empty">在搜索框输入股票开始添加</div>
 
