@@ -94,19 +94,19 @@ tr.deleting .del { opacity: 0.7; }
 .empty { text-align: center; padding: 40px 0; color: #aaa; font-size: 14px; }
 #stockSearchContainer { flex: 2; min-width: 120px; }
 @media (max-width: 600px) {
-  body { padding: 8px; }
+  body { padding: 0; }
   .form-row input { min-width: 45px; font-size: 13px; padding: 7px 8px; }
   #stockSearchContainer { min-width: 90px; }
   .form-row { gap: 4px; }
   table { table-layout: fixed; width: 100%; }
   th, td { padding: 5px 2px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  th:first-child, td:first-child { width: 20%; text-align: left; }
-  th:nth-child(2), td:nth-child(2) { width: 12%; }
+  th:first-child, td:first-child { width: 19%; text-align: left; }
+  th:nth-child(2), td:nth-child(2) { width: 14%; }
   th:nth-child(3), td:nth-child(3) { width: 12%; }
   th:nth-child(4), td:nth-child(4) { width: 13%; }
-  th:nth-child(5), td:nth-child(5) { width: 19%; }
-  th:nth-child(6), td:nth-child(6) { width: 17%; }
-  th:nth-child(7), td:nth-child(7) { width: 7%; }
+  th:nth-child(5), td:nth-child(5) { width: 18%; }
+  th:nth-child(6), td:nth-child(6) { width: 18%; }
+  th:nth-child(7), td:nth-child(7) { width: 6%; }
   .del { font-size: 11px; padding: 0 1px; }
   .summary { gap: 10px; font-size: 13px; }
 }
@@ -643,7 +643,7 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function plPct(price, cost) { return cost ? ((price - cost) / cost * 100) : 0; }
-  function fmt(n) { return n === undefined || n === null ? '--' : n.toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function fmt(n) { return n === undefined || n === null ? '--' : n.toLocaleString('zh-CN', {minimumFractionDigits:0, maximumFractionDigits:0}); }
   function fmtPrice(code, n) {
     if (n === undefined || n === null) return '--';
     var digits = (code && (code.indexOf('159') === 0 || code.indexOf('16') === 0 || code.indexOf('51') === 0 || code.indexOf('56') === 0 || code.indexOf('58') === 0)) ? 3 : 2;
