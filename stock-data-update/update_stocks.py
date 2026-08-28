@@ -151,7 +151,9 @@ def is_live(ts):
     """判断时间戳是否为当天实时交易（活股）。退市/历史股为 09:00/09:10 固定值"""
     if not ts or len(ts) < 12:
         return False
-    return ts.startswith('20260814') and ts[8:12] > '0930'
+    from datetime import datetime
+    today = datetime.now().strftime('%Y%m%d')
+    return ts.startswith(today) and ts[8:12] > '0930'
 
 def main():
     tencent = load_tencent(os.path.join(TMP, 'tencent_raw.json'))
