@@ -527,10 +527,15 @@ tr.deleting .del { opacity: 0.7; }
       var groups = {};
       for (var i = 0; i < list.length; i++) {
         var s = list[i];
-        if (!groups[s.code]) groups[s.code] = { name: s.name, items: [], totalQty: 0, totalCostVal: 0, latestTime: '' };
+        if (!groups[s.code]) groups[s.code] = { name: s.name, items: [], totalQty: 0, totalCostVal: 0, totalBuyFee: 0, latestTime: '' };
         groups[s.code].items.push(i);
         groups[s.code].totalQty += s.qty;
         groups[s.code].totalCostVal += s.qty * s.cost;
+        // 累加每条记录的买入手续费
+        var isEtf = s.code.charAt(0) === '5' || s.code.indexOf('159') === 0 || s.code.indexOf('16') === 0;
+        var rate = (isEtf ? settings.etfRate : settings.stockRate) / 10000;
+        var minFee = isEtf ? settings.etfMin : settings.stockMin;
+        groups[s.code].totalBuyFee += Math.max(s.qty * s.cost * rate, minFee);
         if (s.createdAt > (groups[s.code].latestTime || '')) groups[s.code].latestTime = s.createdAt;
       }
       var codeKeys = Object.keys(groups);
@@ -543,10 +548,17 @@ tr.deleting .del { opacity: 0.7; }
         var changePct = p ? p.changePct : null;
         var costVal = grp.totalCostVal;
         var mv = grp.totalQty * (price || 0);
-        var f = getFees(code, costVal, mv);
-        var pl = price ? (f.netVal - f.costWithFees) : 0;
-        if (price) { totalCost += f.costWithFees; totalMv += mv; totalPl += pl; }
-        rowData.push(buildRowData(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, f.netVal, f.costWithFees, pl, code, grp.latestTime, pendingDeletions[code] !== undefined));
+        // 卖出手续费按合并后的市值计算
+        var isEtf2 = code.charAt(0) === '5' || code.indexOf('159') === 0 || code.indexOf('16') === 0;
+        var rate2 = (isEtf2 ? settings.etfRate : settings.stockRate) / 10000;
+        var minFee2 = isEtf2 ? settings.etfMin : settings.stockMin;
+        var sellFee = Math.max(mv * rate2, minFee2);
+        var stampDuty = isEtf2 ? 0 : mv * 0.0005;
+        var costWithFees = costVal + grp.totalBuyFee;
+        var netVal = mv - sellFee - stampDuty;
+        var pl = price ? (netVal - costWithFees) : 0;
+        if (price) { totalCost += costWithFees; totalMv += mv; totalPl += pl; }
+        rowData.push(buildRowData(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, netVal, costWithFees, pl, code, grp.latestTime, pendingDeletions[code] !== undefined));
       }
     } else {
       for (var i = 0; i < list.length; i++) {
