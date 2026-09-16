@@ -588,14 +588,21 @@ tr.deleting .del { opacity: 0.7; }
         var changePct = p ? p.changePct : null;
         var costVal = grp.totalCostVal;
         var mv = grp.totalQty * (price || 0);
-        // 卖出手续费按合并后的市值计算
         var isEtf2 = code.charAt(0) === '5' || code.indexOf('159') === 0 || code.indexOf('16') === 0;
         var rate2 = (isEtf2 ? settings.etfRate : settings.stockRate) / 10000;
         var minFee2 = isEtf2 ? settings.etfMin : settings.stockMin;
-        var sellFee = Math.max(mv * rate2, minFee2);
-        var stampDuty = isEtf2 ? 0 : mv * 0.0005;
-        var costWithFees = costVal + grp.totalBuyFee;
-        var netVal = mv - sellFee - stampDuty;
+        var costWithFees, netVal;
+        if (grp.totalQty >= 0) {
+          // 净买入：只有买入手续费，无卖出费用
+          costWithFees = costVal + grp.totalBuyFee;
+          netVal = mv;
+        } else {
+          // 净卖出：只有卖出费用，无买入手续费
+          var sellFee = Math.max(Math.abs(mv) * rate2, minFee2);
+          var stampDuty = isEtf2 ? 0 : Math.abs(mv) * 0.0005;
+          costWithFees = costVal;
+          netVal = mv + sellFee + stampDuty; // mv 是负数，加回手续费和印花税
+        }
         var pl = price ? (netVal - costWithFees) : 0;
         if (price) { totalCost += costWithFees; totalMv += mv; totalPl += pl; }
         rowData.push(buildRowData(grp.name, code, grp.totalQty, avgCost, price, changePct, mv, netVal, costWithFees, pl, code, grp.latestTime, pendingDeletions[code] !== undefined));
