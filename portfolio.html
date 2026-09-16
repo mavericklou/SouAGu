@@ -547,7 +547,7 @@ tr.deleting .del { opacity: 0.7; }
 
     function buildRowData(name, code, qty, cost, price, changePct, mv, netVal, costWithFees, pl, delIdx, createdAt, isPending) {
       var cls = price ? (pl > 0 ? 'up' : pl < 0 ? 'down' : 'flat') : '';
-      var plPctVal = costWithFees ? ((netVal - costWithFees) / costWithFees * 100) : 0;
+      var plPctVal = costWithFees ? ((netVal - costWithFees) / Math.abs(costWithFees) * 100) : 0;
       var delIcon = isPending ? '↩' : '✕';
       var delClass = isPending ? 'del undo' : 'del';
       var rowClass = isPending ? ' class="deleting"' : '';
