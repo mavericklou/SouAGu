@@ -109,8 +109,6 @@ tr.deleting .del { opacity: 0.7; }
   th:nth-child(7), td:nth-child(7) { width: 5%; }
   .del { font-size: 11px; padding: 0 1px; }
   .summary { gap: 8px; font-size: 13px; margin-bottom: 6px; }
-  #filterSearchContainer { width: 140px !important; }
-  #filterSearchContainer .ss-input { padding: 5px 28px 5px 10px; font-size: 12px; }
 }
 
 /* -------- 表格右上角操作按钮 -------- */
@@ -294,10 +292,7 @@ tr.deleting .del { opacity: 0.7; }
 <div class="summary" id="summary"></div>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-  <div style="display:flex;align-items:center;gap:12px">
-    <div class="status" id="status">加载中...</div>
-    <div id="filterSearchContainer" style="width:180px"></div>
-  </div>
+  <div class="status" id="status">加载中...</div>
   <div class="merge-switch" id="mergeSwitch" title="合并相同股票">
     <div class="switch-track" id="switchTrack"><div class="switch-knob"></div></div>
     <span>合并相同</span>
@@ -393,6 +388,14 @@ tr.deleting .del { opacity: 0.7; }
     document.getElementById('qty').focus();
   });
 
+  // 输入时同步更新过滤器
+  ss.onInput(function(e) {
+    if (!e.query) {
+      filterCode = '';
+      render();
+    }
+  });
+
   // 输入框失焦时，唯一代码自动填充
   document.querySelector('#stockSearchContainer .ss-input').addEventListener('blur', function() {
     var self = this;
@@ -405,9 +408,35 @@ tr.deleting .del { opacity: 0.7; }
           selectedStock = results[0];
           document.getElementById('addBtn').disabled = false;
           self.value = results[0].n + ' (' + results[0].c + ')';
+          filterCode = results[0].c;
+          render();
         }
       }
     }, 200);
+  });
+
+  // 输入时更新过滤器
+  document.querySelector('#stockSearchContainer .ss-input').addEventListener('input', function() {
+    var val = this.value.trim();
+    if (!val) {
+      filterCode = '';
+      render();
+      return;
+    }
+    // 如果输入的是纯数字且长度>=6，当作股票代码过滤
+    if (/^\d{6,}$/.test(val)) {
+      filterCode = val;
+      render();
+      return;
+    }
+    // 否则搜索匹配的股票，用第一个匹配的代码过滤
+    var results = ss.search(val);
+    if (results.length > 0) {
+      filterCode = results[0].c;
+    } else {
+      filterCode = val;
+    }
+    render();
   });
 
   /* -------- Keydown 处理 -------- */
@@ -681,6 +710,7 @@ tr.deleting .del { opacity: 0.7; }
     saveList(list);
 
     ss.clear();
+    filterCode = ''; // 清空过滤器
     document.querySelector('#stockSearchContainer .ss-input').focus();
     document.getElementById('qty').value = '';
     document.getElementById('cost').value = '';
@@ -754,60 +784,6 @@ tr.deleting .del { opacity: 0.7; }
   document.getElementById('confirmImportBtn').addEventListener('click', function() {
     var val = document.getElementById('importInput').value.trim();
     doImport(val);
-  });
-
-  /* -------- 表格筛选 -------- */
-  var filterSS = new SouAGu('#filterSearchContainer', {
-    placeholder: '输入代码/名称过滤',
-    width: '100%',
-    maxResults: 10,
-    zIndex: '99',
-    theme: 'light'
-  });
-  filterSS.setData(window.__STOCKS_DATA);
-  filterSS.onSelect(function(stock) {
-    filterCode = stock.c;
-    render();
-  });
-  filterSS.onInput(function(e) {
-    if (!e.query) {
-      filterCode = '';
-      render();
-    }
-  });
-  // SouAGu 内置清除按钮点击时重置筛选
-  document.querySelector('#filterSearchContainer .ss-clear').addEventListener('click', function() {
-    filterCode = '';
-    render();
-  });
-  // 手动删除字符清空时重置
-  document.querySelector('#filterSearchContainer .ss-input').addEventListener('input', function() {
-    if (!this.value.trim() && filterCode) {
-      filterCode = '';
-      render();
-    }
-  });
-  // 输入框失焦时，唯一代码自动填充并筛选
-  document.querySelector('#filterSearchContainer .ss-input').addEventListener('blur', function() {
-    var self = this;
-    setTimeout(function() {
-      var val = self.value.trim();
-      if (val && val.indexOf('(') === -1) {
-        var results = filterSS.search(val);
-        if (results.length === 1) {
-          filterCode = results[0].c;
-          render();
-          self.value = results[0].n + ' (' + results[0].c + ')';
-          // 隐藏下拉框
-          var dd = document.querySelector('#filterSearchContainer .ss-dropdown');
-          if (dd) dd.style.display = 'none';
-        } else if (results.length === 0) {
-          // 无匹配时清除筛选
-          filterCode = '';
-          render();
-        }
-      }
-    }, 200);
   });
 
   /* -------- 导出/导入 核心逻辑 -------- */
