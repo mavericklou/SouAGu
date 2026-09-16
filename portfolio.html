@@ -412,6 +412,9 @@ tr.deleting .del { opacity: 0.7; }
           render();
         }
       }
+      // 隐藏下拉框
+      var dd = document.querySelector('#stockSearchContainer .ss-dropdown');
+      if (dd) dd.style.display = 'none';
     }, 200);
   });
 
@@ -442,6 +445,8 @@ tr.deleting .del { opacity: 0.7; }
   // 清除按钮点击时重置过滤器
   document.querySelector('#stockSearchContainer .ss-clear').addEventListener('click', function() {
     filterCode = '';
+    // 清空输入框
+    document.querySelector('#stockSearchContainer .ss-input').value = '';
     render();
   });
 
