@@ -439,6 +439,12 @@ tr.deleting .del { opacity: 0.7; }
     render();
   });
 
+  // 清除按钮点击时重置过滤器
+  document.querySelector('#stockSearchContainer .ss-clear').addEventListener('click', function() {
+    filterCode = '';
+    render();
+  });
+
   /* -------- Keydown 处理 -------- */
   document.getElementById('qty').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addStock();
