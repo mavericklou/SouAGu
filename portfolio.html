@@ -432,13 +432,8 @@ tr.deleting .del { opacity: 0.7; }
       render();
       return;
     }
-    // 否则搜索匹配的股票，用第一个匹配的代码过滤
-    var results = ss.search(val);
-    if (results.length > 0) {
-      filterCode = results[0].c;
-    } else {
-      filterCode = val;
-    }
+    // 否则直接作为关键词过滤
+    filterCode = val;
     render();
   });
 
@@ -509,14 +504,20 @@ tr.deleting .del { opacity: 0.7; }
 
   function render() {
     var list = loadList();
-    // 保险：筛选框已空但筛选状态残留时自动重置
-    var filterInput = document.querySelector('#filterSearchContainer .ss-input');
-    if (filterInput && !filterInput.value.trim() && filterCode) {
-      filterCode = '';
-    }
     // 应用筛选
     if (filterCode) {
-      list = list.filter(function(s) { return s.code.indexOf(filterCode) !== -1; });
+      // 最短长度：中文2字，数字3位，混合2字符
+      var isAllCn = /^[\u4e00-\u9fa5]+$/.test(filterCode);
+      var isAllNum = /^\d+$/.test(filterCode);
+      var minLen = isAllNum ? 3 : 2;
+      if (filterCode.length >= minLen) {
+        var kw = filterCode.toLowerCase();
+        list = list.filter(function(s) {
+          return s.name.toLowerCase().indexOf(kw) !== -1 || s.code.indexOf(kw) !== -1;
+        });
+      } else {
+        list = [];
+      }
     }
     var tbody = document.getElementById('tbody');
     var empty = document.getElementById('empty');
