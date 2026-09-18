@@ -6,19 +6,23 @@
 
 ```javascript
 function getFees(code, costVal, mv) {
-  var buyFee = max(costVal * rate, minFee);    // 买入手续费（基于成本）
-  var sellFee = max(mv * rate, minFee);         // 卖出手续费（基于市值）
-  var stampDuty = mv * 0.0005;                  // 印花税（仅股票）
+  var absCost = Math.abs(costVal);
+  var absMv = Math.abs(mv);
+  var buyFee = max(absCost * rate, minFee);    // 买入手续费（基于成本绝对值）
+  var sellFee = max(absMv * rate, minFee);      // 卖出手续费（基于市值绝对值）
+  var stampDuty = absMv * 0.0005;               // 印花税（仅股票）
   return {
-    costWithFees = costVal + buyFee,            // 含买入手续费的成本
+    costWithFees = costVal + buyFee,            // 含买入手续费的成本（保留符号）
     netVal = mv - sellFee - stampDuty,          // 扣除卖出费用后的市值
     pl = netVal - costWithFees                   // 盈亏
   };
 }
 ```
 
-- 买入记录（qty > 0）：costVal 和 mv 均为正，双向费用合理
-- 卖出记录（qty < 0）：costVal 和 mv 均为负，Math.max 兜底至 minFee
+- 费率计算使用绝对值，确保卖出记录（负数）也按实际金额计算手续费
+- costWithFees 和 netVal 保留原始符号，保证盈亏方向正确
+- 买入记录（qty > 0）：正向成本 + 买入手续费，卖出手续费从市值中扣除
+- 卖出记录（qty < 0）：负向成本 + 买入手续费（正值），卖出手续费从负市值中扣除
 
 ## 合并模式
 
