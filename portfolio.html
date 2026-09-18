@@ -543,9 +543,11 @@ tr.deleting .del { opacity: 0.7; }
       var isEtf = code.charAt(0) === '5' || code.indexOf('159') === 0 || code.indexOf('16') === 0;
       var rate = (isEtf ? settings.etfRate : settings.stockRate) / 10000;
       var minFee = isEtf ? settings.etfMin : settings.stockMin;
-      var buyFee = Math.max(costVal * rate, minFee);
-      var sellFee = Math.max(mv * rate, minFee);
-      var stampDuty = isEtf ? 0 : mv * 0.0005;
+      var absCost = Math.abs(costVal);
+      var absMv = Math.abs(mv);
+      var buyFee = Math.max(absCost * rate, minFee);
+      var sellFee = Math.max(absMv * rate, minFee);
+      var stampDuty = isEtf ? 0 : absMv * 0.0005;
       return { buyFee: buyFee, sellFee: sellFee, stampDuty: stampDuty, netVal: mv - sellFee - stampDuty, costWithFees: costVal + buyFee };
     }
 
