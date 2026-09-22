@@ -384,8 +384,10 @@ tr.deleting .del { opacity: 0.7; }
 
   ss.onSelect(function(stock) {
     selectedStock = stock;
+    filterCode = stock.c;
     document.getElementById('addBtn').disabled = false;
     document.getElementById('qty').focus();
+    render();
   });
 
   // 输入时同步更新过滤器
