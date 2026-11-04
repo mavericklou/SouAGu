@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>后台管理 - 持仓助手</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+  <div class="dashboard-page">
+    <div class="dashboard-header">
+      <h1 class="dashboard-title">持仓助手</h1>
+      <div class="header-actions">
+        <span class="user-name" id="nickname">加载中...</span>
+        <button class="btn btn-small btn-outline" onclick="logout()">退出</button>
+      </div>
+    </div>
+    
+    <div class="content">
+      <div class="section">
+        <div class="section-title">分享链接</div>
+        <div class="share-box">
+          <input type="text" id="shareUrl" class="share-input" readonly>
+          <button class="btn btn-small" onclick="copyLink()">复制</button>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">添加持仓</div>
+        <div class="holdings-form">
+          <input type="text" id="stockCode" class="input" placeholder="股票代码">
+          <input type="text" id="stockName" class="input" placeholder="股票名称">
+          <div class="form-row">
+            <input type="number" id="quantity" class="input" placeholder="持股数">
+            <input type="number" id="costPrice" class="input" placeholder="成本价" step="0.001">
+          </div>
+          <button class="btn" onclick="addHolding()">添加</button>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">当前持仓</div>
+        <div id="holdingsList" class="holdings-list">
+          <div class="empty-tip">暂无持仓</div>
+        </div>
+      </div>
+      
+      <div class="section qr-section">
+        <div class="section-title">打赏二维码</div>
+        <p style="font-size: 13px; color: #666; margin-bottom: 12px;">上传赞赏码，学生可扫码打赏</p>
+        <div class="qr-preview" id="qrPreview">暂无</div>
+        <label class="qr-upload">
+          <input type="file" id="qrInput" accept="image/*" style="display: none;" onchange="uploadQr()">
+          点击上传图片
+        </label>
+      </div>
+    </div>
+  </div>
+  
+  <script src="/js/common.js"></script>
+  <script>
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await checkAuth();
+      if (!currentUser) {
+        redirectToLogin();
+        return;
+      }
+      
+      document.getElementById('nickname').textContent = currentUser.nickname || currentUser.username;
+      document.getElementById('shareUrl').value = `${window.location.origin}/teacher/${currentUser.id}`;
+      
+      loadHoldings();
+    }
+    
+    async function loadHoldings() {
+      try {
+        const holdings = await api.get('/api/my/holdings');
+        renderHoldings(holdings);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    
+    function renderHoldings(holdings) {
+      const container = document.getElementById('holdingsList');
+      
+      if (holdings.length === 0) {
+        container.innerHTML = '<div class="empty-tip">暂无持仓</div>';
+        return;
+      }
+      
+      container.innerHTML = holdings.map(h => `
+        <div class="holding-item">
+          <div class="holding-info">
+            <div class="holding-name">${h.stock_name}</div>
+            <div class="holding-code">${h.stock_code}</div>
+          </div>
+          <div class="holding-detail">
+            <div class="holding-qty">${fmt0(h.quantity)}股</div>
+            <div class="holding-cost">成本 ${h.cost_price}</div>
+          </div>
+          <div class="holding-actions">
+            <button class="btn-delete" onclick="deleteHolding(${h.id})">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    async function addHolding() {
+      const code = document.getElementById('stockCode').value.trim();
+      const name = document.getElementById('stockName').value.trim();
+      const qty = parseInt(document.getElementById('quantity').value);
+      const price = parseFloat(document.getElementById('costPrice').value);
+      
+      if (!code || !name || !qty || !price) {
+        alert('请填写完整信息');
+        return;
+      }
+      
+      try {
+        await api.post('/api/my/holdings', {
+          stock_code: code,
+          stock_name: name,
+          quantity: qty,
+          cost_price: price
+        });
+        
+        document.getElementById('stockCode').value = '';
+        document.getElementById('stockName').value = '';
+        document.getElementById('quantity').value = '';
+        document.getElementById('costPrice').value = '';
+        
+        loadHoldings();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+    
+    async function deleteHolding(id) {
+      if (!confirm('确定删除？')) return;
+      
+      try {
+        await api.delete(`/api/my/holdings/${id}`);
+        loadHoldings();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+    
+    async function uploadQr() {
+      const input = document.getElementById('qrInput');
+      if (!input.files[0]) return;
+      
+      const formData = new FormData();
+      formData.append('qrcode', input.files[0]);
+      
+      try {
+        const res = await fetch('/api/my/tip-qr', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.url) {
+          document.getElementById('qrPreview').innerHTML = `<img src="${data.url}">`;
+          alert('上传成功');
+        }
+      } catch (e) {
+        alert('上传失败');
+      }
+    }
+    
+    function copyLink() {
+      const input = document.getElementById('shareUrl');
+      input.select();
+      document.execCommand('copy');
+      alert('链接已复制');
+    }
+    
+    async function logout() {
+      await api.post('/api/auth/logout');
+      window.location.href = '/login';
+    }
+    
+    init();
+  </script>
+</body>
+</html>
