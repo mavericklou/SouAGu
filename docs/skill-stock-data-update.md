@@ -95,7 +95,15 @@ git push origin vX.X.X
 ## 常见问题
 
 ### Q: 新股搜不到？
-A: 检查代码是否在扫描范围内（41个千位区间），如不在可补充 `fetch_tencent.py` 中的 `PREFIX_RANGES`。
+A: **按顺序排查**：
+1. **先查 CDN 版本号**（最常见原因）！`portfolio.html` 里 `stocks-data.js` 的引用必须指向最新 tag。数据更新后如果忘了改版本号或忘了打 tag，页面加载的仍是旧数据。
+   ```bash
+   grep -n "stocks-data.js" portfolio.html
+   curl -s "https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@vX.X.X/stocks-data.js" | grep -o '"c":' | wc -l
+   ```
+2. 确认本地 `stocks-data.js` 里确实有该代码：`grep '"c":"301716"' stocks-data.js`
+3. 检查代码是否在扫描范围内（见 `fetch_tencent.py` 的 `PREFIX_RANGES`），如不在可补充。
+4. 用浏览器强刷（Cmd+Shift+R），jsDelivr 有缓存。
 
 ### Q: 名称被截断？
 A: 腾讯API对名称有10字节(GBK)限制，超长名称会被截断。需人工核实后加入 `MANUAL_FIX`。
@@ -124,5 +132,6 @@ stock-data-update/
 
 | 日期 | 新增数量 | 主要新增 |
 |------|----------|----------|
+| 2026-11-04 | +60 | 鸿富诚(301716)、安达股份(920202)、粤芯半导体(301660)等（v0.0.10） |
 | 2026-08-28 | +10 | 宇树科技(688836)、频准激光(688826)等 |
 | 2026-08-14 | +0 | 基础数据7460条 |
