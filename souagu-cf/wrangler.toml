@@ -1,0 +1,10 @@
+name = "souagu"
+compatibility_date = "2026-11-01"
+pages_build_output_dir = "public"
+
+# KV 绑定：变量名必须与 functions/api/sync.js 里的 env.HOLDINGS 一致。
+# 首次部署前把 id 换成 `npx wrangler kv namespace create HOLDINGS` 返回的 id。
+# deploy.sh 会自动尝试从你的账号里查找并填入。
+[[kv_namespaces]]
+binding = "HOLDINGS"
+id = "REPLACE_WITH_KV_ID"

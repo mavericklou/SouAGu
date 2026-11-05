@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>持仓助手</title>
-<link rel="manifest" href="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.9/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="持仓助手">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -109,6 +109,10 @@ tr.deleting .del { opacity: 0.7; }
   th:nth-child(7), td:nth-child(7) { width: 5%; }
   .del { font-size: 11px; padding: 0 1px; }
   .summary { gap: 8px; font-size: 13px; margin-bottom: 6px; }
+  h1 { font-size: 19px; }
+  #headerRow { row-gap: 6px; padding: 0 6px; }
+  .table-actions { flex-wrap: wrap; justify-content: flex-end; }
+  #syncBtn, #exportBtn, #importBtn, #settingsPageBtn { padding: 0 6px; font-size: 11px; }
 }
 
 /* -------- 表格右上角操作按钮 -------- */
@@ -121,14 +125,20 @@ tr.deleting .del { opacity: 0.7; }
 #installBtn:hover { background: rgba(26,115,232,0.22); transform: scale(1.08); }
 #installBtn:active { transform: scale(0.94); }
 #installBtn.hidden { display: none; }
-#exportBtn, #importBtn, #settingsPageBtn {
+#exportBtn, #importBtn, #settingsPageBtn, #syncBtn {
   height: 32px; padding: 0 10px; border-radius: 6px;
   border: none; background: rgba(0,0,0,0.04); color: #666;
   font-size: 12px; cursor: pointer; transition: background .15s;
-  display: flex; align-items: center;
+  display: flex; align-items: center; gap: 4px;
 }
-#exportBtn:hover, #importBtn:hover, #settingsPageBtn:hover { background: rgba(0,0,0,0.08); color: #333; }
-.table-actions { display: flex; gap: 4px; align-items: center; }
+#exportBtn:hover, #importBtn:hover, #settingsPageBtn:hover, #syncBtn:hover { background: rgba(0,0,0,0.08); color: #333; }
+#syncBtn.bound { color: #1a73e8; background: rgba(26,115,232,0.10); }
+#syncBtn.bound:hover { background: rgba(26,115,232,0.18); }
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #bbb; flex-shrink: 0; }
+.sync-dot.ok { background: #1a9c5b; }
+.sync-dot.err { background: #e74c3c; }
+.sync-dot.busy { background: #f5a623; }
+.table-actions { display: flex; gap: 4px; align-items: center; margin-left: auto; }
 
 /* -------- 导出/导入弹窗 -------- */
 .export-overlay {
@@ -158,6 +168,70 @@ tr.deleting .del { opacity: 0.7; }
 }
 .import-tab:hover { color: #666; }
 .import-tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+
+/* -------- 云同步弹窗 -------- */
+.sync-desc { font-size: 13px; color: #666; line-height: 1.65; margin: 0 0 14px; }
+.sync-desc b { color: #e07b00; }
+.sync-primary-btn {
+  width: 100%; padding: 10px; background: #1a73e8; color: #fff; border: none;
+  border-radius: 8px; font-size: 14px; cursor: pointer; transition: background .15s;
+}
+.sync-primary-btn:hover { background: #1557b0; }
+.sync-primary-btn:disabled { background: #b9cff0; cursor: default; }
+.sync-secondary-btn {
+  padding: 9px 16px; background: #f0f0f0; color: #333; border: none;
+  border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+.sync-secondary-btn:hover { background: #e5e5e5; }
+.sync-secondary-btn:disabled { opacity: .5; cursor: default; }
+.sync-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: #bbb; font-size: 12px; }
+.sync-divider::before, .sync-divider::after { content: ''; flex: 1; height: 1px; background: #eee; }
+.sync-input-row { display: flex; gap: 6px; }
+.sync-input-row input {
+  flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid #ddd; border-radius: 8px;
+  font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  text-transform: uppercase; outline: none;
+}
+.sync-input-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.12); }
+.sync-advanced { margin-top: 14px; font-size: 12px; color: #999; }
+.sync-advanced summary { cursor: pointer; user-select: none; }
+.sync-advanced input {
+  width: 100%; margin-top: 8px; padding: 8px 10px; border: 1px solid #ddd;
+  border-radius: 6px; font-size: 12px; outline: none;
+}
+.sync-advanced p { margin-top: 6px; line-height: 1.5; }
+.sync-code-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: #f7f8fa; border-radius: 10px; padding: 12px 14px;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; letter-spacing: .5px;
+}
+.sync-code-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-mini-btn {
+  padding: 5px 10px; background: #fff; border: 1px solid #ddd; border-radius: 6px;
+  font-size: 12px; color: #555; cursor: pointer; white-space: nowrap;
+}
+.sync-mini-btn:hover { background: #f0f0f0; }
+.sync-state { font-size: 12px; color: #999; margin: 10px 0 16px; min-height: 18px; line-height: 1.6; }
+.sync-bound-actions { display: flex; gap: 8px; }
+.sync-bound-actions .sync-primary-btn { flex: 1; width: auto; }
+.sync-msg { font-size: 12px; margin-top: 12px; line-height: 1.6; min-height: 16px; word-break: break-word; }
+.sync-msg.ok { color: #1a9c5b; }
+.sync-msg.err { color: #e74c3c; }
+.sync-msg.info { color: #1a73e8; }
+.sync-link-btn {
+  background: none; border: none; color: #999; font-size: 12px;
+  cursor: pointer; text-decoration: underline; margin-top: 10px; padding: 0;
+}
+.sync-link-btn:hover { color: #555; }
+#syncChoiceActions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+#syncChoiceActions .sync-secondary-btn, #syncChoiceActions .sync-primary-btn { width: 100%; }
+#syncToast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+  background: rgba(30,30,35,0.92); color: #fff; font-size: 13px; padding: 10px 18px;
+  border-radius: 20px; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+  z-index: 100000; max-width: 80vw; text-align: center;
+}
+#syncToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* -------- 遮罩层 / 弹窗 -------- */
 #installOverlay {
@@ -271,9 +345,64 @@ tr.deleting .del { opacity: 0.7; }
   </div>
 </div>
 
-<div style="display:flex;align-items:center;justify-content:space-between">
+<!-- -------- 云同步弹窗 -------- -->
+<div id="syncOverlay" class="export-overlay" onclick="if(event.target===this)closeSync()">
+  <div class="export-box" style="max-width:420px">
+    <button class="close-x" onclick="closeSync()">✕</button>
+    <h3>☁️ 云端同步</h3>
+
+    <!-- 未绑定 -->
+    <div id="syncUnbound">
+      <p class="sync-desc">用同一个同步码在多台设备间同步持仓。<b>同步码等同于密码</b>，请妥善保管，丢失后无法找回；任何拿到它的人都能读写你的数据。</p>
+      <button id="syncGenerateBtn" class="sync-primary-btn">生成新同步码</button>
+      <div class="sync-divider"><span>或使用已有同步码</span></div>
+      <div class="sync-input-row">
+        <input id="syncCodeInput" type="text" placeholder="SG-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button id="syncConnectBtn" class="sync-secondary-btn">连接</button>
+      </div>
+      <details class="sync-advanced">
+        <summary>高级：自定义服务地址</summary>
+        <input id="syncEndpointInput" type="text" placeholder="默认 /api/sync" autocomplete="off" spellcheck="false">
+        <p>仅当页面与同步服务不在同一域名时需要填写，例如 https://souagu.pages.dev/api/sync</p>
+      </details>
+    </div>
+
+    <!-- 已绑定 -->
+    <div id="syncBound" style="display:none">
+      <div class="sync-code-row">
+        <span id="syncCodeDisplay"></span>
+        <button id="syncCopyBtn" class="sync-mini-btn">复制</button>
+      </div>
+      <div id="syncState" class="sync-state">尚未同步</div>
+      <div class="sync-bound-actions">
+        <button id="syncNowBtn" class="sync-primary-btn">立即同步</button>
+        <button id="syncDisconnectBtn" class="sync-secondary-btn">断开</button>
+      </div>
+    </div>
+
+    <div id="syncMsg" class="sync-msg"></div>
+    <div id="syncRestoreRow" style="display:none;text-align:center">
+      <button id="syncRestoreBtn" class="sync-link-btn">恢复最近的自动备份</button>
+    </div>
+  </div>
+</div>
+
+<!-- -------- 云同步首次绑定选择 -------- -->
+<div id="syncChoiceOverlay" class="export-overlay" onclick="if(event.target===this)closeSyncChoice()">
+  <div class="export-box" style="max-width:380px">
+    <button class="close-x" onclick="closeSyncChoice()">✕</button>
+    <h3 id="syncChoiceTitle">请选择</h3>
+    <div id="syncChoiceBody" style="font-size:13px;color:#666;line-height:1.7;margin-top:6px"></div>
+    <div id="syncChoiceActions"></div>
+  </div>
+</div>
+
+<div id="syncToast"></div>
+
+<div id="headerRow" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
   <h1>📊 持仓助手</h1>
   <div class="table-actions">
+    <button id="syncBtn" title="云端同步"><span class="sync-dot" id="syncDot"></span>同步</button>
     <button id="exportBtn" title="导出持仓数据">导出</button>
     <button id="importBtn" title="导入持仓数据">导入</button>
     <button id="settingsPageBtn" title="费率设置">设置</button>
@@ -359,6 +488,168 @@ tr.deleting .del { opacity: 0.7; }
 <!-- 通过 jsDelivr CDN 加载（无需下载，双击即可用） -->
 <script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.10/stocks-data.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/mavericklou/SouAGu@v0.0.8/SouAGu.js"></script>
+
+<!-- 云同步纯逻辑（无 DOM 依赖，便于单测） -->
+<script>
+/* SYNC_CORE_START */
+(function (root) {
+  'use strict';
+  var ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  function nowIso() { return new Date().toISOString(); }
+
+  function uuid() {
+    if (root.crypto && typeof root.crypto.randomUUID === 'function') return root.crypto.randomUUID();
+    var bytes = new Uint8Array(16);
+    if (root.crypto && root.crypto.getRandomValues) root.crypto.getRandomValues(bytes);
+    else for (var i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    var hex = Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+  }
+
+  function isUuid(v) {
+    return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+  }
+
+  function normalizeCode(input) {
+    var s = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (s.length === 18 && s.indexOf('SG') === 0) s = s.slice(2);
+    if (!/^[A-HJ-NP-Z2-9]{16}$/.test(s)) return '';
+    return 'SG-' + s.match(/.{4}/g).join('-');
+  }
+
+  function generateCode() {
+    var bytes = new Uint8Array(16);
+    if (root.crypto && root.crypto.getRandomValues) root.crypto.getRandomValues(bytes);
+    else for (var i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+    var out = '';
+    for (var j = 0; j < 16; j++) out += ALPHABET[bytes[j] % 32];
+    return 'SG-' + out.match(/.{4}/g).join('-');
+  }
+
+  function timeVal(v) {
+    var t = Date.parse(v);
+    return isNaN(t) ? 0 : t;
+  }
+
+  function cleanRecord(r) {
+    if (!r || typeof r !== 'object') return null;
+    var code = String(r.code || '');
+    if (!/^\d{6}$/.test(code)) return null;
+    var out = {
+      id: (typeof r.id === 'string' && r.id) ? r.id : uuid(),
+      code: code,
+      name: String(r.name || code),
+      qty: Number(r.qty),
+      cost: Number(r.cost),
+      createdAt: r.createdAt || nowIso(),
+      updatedAt: r.updatedAt || r.createdAt || nowIso(),
+      deletedAt: r.deletedAt || null
+    };
+    if (!isFinite(out.qty)) out.qty = 0;
+    if (!isFinite(out.cost)) out.cost = 0;
+    return out;
+  }
+
+  function migrateIds(list) {
+    var changed = false;
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      if (!isUuid(r.id)) { r.id = uuid(); r.updatedAt = nowIso(); changed = true; }
+      if (!r.updatedAt) { r.updatedAt = r.createdAt || nowIso(); changed = true; }
+      if (r.deletedAt === undefined) { r.deletedAt = null; changed = true; }
+    }
+    return changed;
+  }
+
+  function active(list) {
+    return (list || []).filter(function (r) { return r && !r.deletedAt; });
+  }
+
+  // 按 id 合并；同一 id 取 updatedAt 较新者。时间相同：墓碑优先，其次云端（远端）优先。
+  function mergeHoldings(local, remote) {
+    var map = {};
+    function add(r, isRemote) {
+      r = cleanRecord(r);
+      if (!r) return;
+      var cur = map[r.id];
+      if (!cur) { map[r.id] = r; return; }
+      var a = timeVal(r.updatedAt), b = timeVal(cur.updatedAt);
+      var rankA = r.deletedAt ? 1 : 0, rankB = cur.deletedAt ? 1 : 0;
+      if (a > b || (a === b && (rankA > rankB || (rankA === rankB && isRemote)))) map[r.id] = r;
+    }
+    (local || []).forEach(function (r) { add(r, false); });
+    (remote || []).forEach(function (r) { add(r, true); });
+    return Object.keys(map).map(function (k) { return map[k]; })
+      .sort(function (x, y) { return x.id < y.id ? -1 : x.id > y.id ? 1 : 0; });
+  }
+
+  function mergeSettings(localSettings, localTs, remoteSettings, remoteTs) {
+    var l = localSettings && typeof localSettings === 'object' ? localSettings : null;
+    var r = remoteSettings && typeof remoteSettings === 'object' ? remoteSettings : null;
+    var lt = Number(localTs) || 0, rt = Number(remoteTs) || 0;
+    if (r && (!l || rt > lt || (rt === lt))) return { settings: r, updatedAt: rt };
+    return { settings: l, updatedAt: lt };
+  }
+
+  function mergeDocs(localDoc, remoteDoc) {
+    localDoc = localDoc || {};
+    remoteDoc = remoteDoc || {};
+    var merged = mergeHoldings(localDoc.holdings, remoteDoc.holdings);
+    var s = mergeSettings(localDoc.settings, localDoc.settingsUpdatedAt, remoteDoc.settings, remoteDoc.settingsUpdatedAt);
+    return { holdings: merged, settings: s.settings, settingsUpdatedAt: s.updatedAt };
+  }
+
+  function canonical(doc) {
+    var hs = (doc.holdings || []).map(cleanRecord).filter(Boolean).map(function (r) {
+      return [r.id, r.code, r.name, r.qty, r.cost, r.createdAt, r.updatedAt, r.deletedAt || ''].join('\u0001');
+    }).sort().join('\u0002');
+    var s = doc.settings && typeof doc.settings === 'object' ? doc.settings : {};
+    var sk = Object.keys(s).sort().map(function (k) { return k + '=' + s[k]; }).join('&');
+    return hs + '\u0003' + sk + '\u0003' + (Number(doc.settingsUpdatedAt) || 0);
+  }
+
+  function docHash(doc) {
+    var str = canonical(doc || {});
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h * 0x01000193) >>> 0;
+    }
+    return h.toString(16) + ':' + str.length;
+  }
+
+  // 同代码 + 同数量 + 同成本但 id 不同，视为“可能重复”
+  function countDuplicates(holdings) {
+    var map = {};
+    active(holdings).forEach(function (r) {
+      var k = r.code + '|' + r.qty + '|' + r.cost;
+      map[k] = (map[k] || 0) + 1;
+    });
+    var n = 0;
+    Object.keys(map).forEach(function (k) { if (map[k] > 1) n += map[k] - 1; });
+    return n;
+  }
+
+  root.SouAGuSyncCore = {
+    uuid: uuid,
+    isUuid: isUuid,
+    normalizeCode: normalizeCode,
+    generateCode: generateCode,
+    cleanRecord: cleanRecord,
+    migrateIds: migrateIds,
+    active: active,
+    mergeHoldings: mergeHoldings,
+    mergeDocs: mergeDocs,
+    docHash: docHash,
+    countDuplicates: countDuplicates
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+/* SYNC_CORE_END */
+</script>
+
 <script>
 (function() {
   'use strict';
@@ -456,41 +747,96 @@ tr.deleting .del { opacity: 0.7; }
   });
 
   /* -------- 存储 -------- */
-  function loadList() {
+  var SyncCore = window.SouAGuSyncCore;
+  function newId() { return SyncCore ? SyncCore.uuid() : (Date.now() + '-' + Math.random().toString(36).slice(2, 10)); }
+
+  // 原始列表：包含软删除的墓碑记录，供同步使用
+  function loadRawList() {
     try {
       var list = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      if (!Array.isArray(list)) return [];
       var changed = false;
       for (var i = 0; i < list.length; i++) {
         if (!list[i].createdAt) { list[i].createdAt = '2026-01-01T00:00:00'; changed = true; }
-        if (!list[i].id) { list[i].id = Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2,8); changed = true; }
+        if (!list[i].id) { list[i].id = newId(); changed = true; }
+        if (!list[i].updatedAt) { list[i].updatedAt = list[i].createdAt; changed = true; }
+        if (list[i].deletedAt === undefined) { list[i].deletedAt = null; changed = true; }
       }
-      if (changed) saveList(list);
+      if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
       return list;
     } catch(e) { return []; }
   }
-  function saveList(list) {
+  // 可见列表：过滤掉已软删除的记录
+  function loadList() {
+    return loadRawList().filter(function(s) { return !s.deletedAt; });
+  }
+  function saveRawList(list) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+  // 保存可见列表，同时保留传入列表里没有的墓碑记录
+  function saveList(list) {
+    var present = {};
+    (list || []).forEach(function(s) { present[s.id] = true; });
+    var tombstones = loadRawList().filter(function(s) {
+      return s.deletedAt && !present[s.id];
+    });
+    saveRawList((list || []).concat(tombstones));
+  }
+  // 整表替换（导入/云端覆盖）：旧记录写成墓碑，避免其他设备把已删数据同步回来
+  function replaceHoldings(newList) {
+    var nowIso = new Date().toISOString();
+    var raw = loadRawList();
+    var keep = {};
+    (newList || []).forEach(function(s) {
+      s.id = s.id || newId();
+      s.createdAt = s.createdAt || nowIso;
+      s.updatedAt = nowIso;
+      s.deletedAt = null;
+      keep[s.id] = true;
+    });
+    var out = [];
+    raw.forEach(function(old) {
+      if (keep[old.id]) return;
+      if (!old.deletedAt) { old.deletedAt = nowIso; old.updatedAt = nowIso; }
+      out.push(old);
+    });
+    saveRawList(out.concat(newList || []));
   }
 
   /* -------- 费率设置 -------- */
   var SETTINGS_KEY = 'portfolio_fee_settings';
+  var SETTINGS_UPDATED_KEY = 'portfolio_fee_settings_updated_at';
   function defaultSettings() {
     return { stockRate: 1, etfRate: 1, stockMin: 5, etfMin: 0.5 };
   }
   function loadSettings() {
     try {
-      var s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return defaultSettings();
+      var s = JSON.parse(raw);
       if (!s) return defaultSettings();
       // 迁移旧数据
       if (s.stockRate < 1) s.stockRate = Math.round(s.stockRate * 10000 * 10) / 10;
       if (s.etfRate < 1) s.etfRate = Math.round(s.etfRate * 10000 * 10) / 10;
       if (s.stockMin === undefined) s.stockMin = 5;
       if (s.etfMin === undefined) s.etfMin = 0.5;
+      // 旧版本没有记录设置更新时间：首次读取时补一个，避免合并时被云端旧设置覆盖
+      if (!localStorage.getItem(SETTINGS_UPDATED_KEY)) {
+        localStorage.setItem(SETTINGS_UPDATED_KEY, String(Date.now()));
+      }
       return s;
     } catch(e) { return defaultSettings(); }
   }
-  function saveSettings(s) {
+  function getSettingsUpdatedAt() {
+    var v = parseInt(localStorage.getItem(SETTINGS_UPDATED_KEY), 10);
+    return isNaN(v) ? 0 : v;
+  }
+  function applySettings(s, ts) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    if (ts) localStorage.setItem(SETTINGS_UPDATED_KEY, String(ts));
+  }
+  function saveSettings(s) {
+    applySettings(s, Date.now());
   }
   function openSettings() {
     var s = loadSettings();
@@ -733,8 +1079,14 @@ tr.deleting .del { opacity: 0.7; }
     }
 
     var list = loadList();
-    list.push({ code: s.c, name: s.n, qty: qty, cost: cost, createdAt: new Date().toISOString(), lastPrice: null, lastChangePct: null });
+    var nowIso = new Date().toISOString();
+    list.push({
+      id: newId(), code: s.c, name: s.n, qty: qty, cost: cost,
+      createdAt: nowIso, updatedAt: nowIso, deletedAt: null,
+      lastPrice: null, lastChangePct: null
+    });
     saveList(list);
+    scheduleSyncPush();
 
     ss.clear();
     filterCode = ''; // 清空过滤器
@@ -758,16 +1110,21 @@ tr.deleting .del { opacity: 0.7; }
       return;
     }
     pendingDeletions[id] = setTimeout(function() {
-      // 真正删除
-      var list = loadList();
-      var merge = document.getElementById('mergeCb').checked;
-      // merge 模式 id=股票代码，否则 id=条目的唯一标识
-      list = merge
-        ? list.filter(function(s) { return s.code !== id; })
-        : list.filter(function(s) { return s.id !== id; });
-      saveList(list);
+      // 真正删除：写入墓碑（deletedAt），以便同步到其他设备
+      var raw = loadRawList();
+      var nowIso = new Date().toISOString();
+      for (var i = 0; i < raw.length; i++) {
+        var s = raw[i];
+        if (s.deletedAt) continue;
+        if (merge ? s.code === id : s.id === id) {
+          s.deletedAt = nowIso;
+          s.updatedAt = nowIso;
+        }
+      }
+      saveRawList(raw);
       delete pendingDeletions[id];
       render();
+      scheduleSyncPush();
     }, 5 * 60 * 1000);
     render();
   }
@@ -865,7 +1222,9 @@ tr.deleting .del { opacity: 0.7; }
         return {
           code: s.c, name: name, qty: s.q, cost: s.p,
           createdAt: new Date().toISOString(),
-          id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+          updatedAt: new Date().toISOString(),
+          deletedAt: null,
+          id: newId(),
           lastPrice: null, lastChangePct: null
         };
       });
@@ -884,10 +1243,11 @@ tr.deleting .del { opacity: 0.7; }
     // 绑定按钮
     document.getElementById('importConfirmOk').onclick = function() {
       overlay.classList.remove('show');
-      saveList(list);
+      replaceHoldings(list);
       if (settings) saveSettings(settings);
       document.getElementById('importOverlay').classList.remove('show');
       render();
+      scheduleSyncPush();
       refreshPrices().then(function() { render(); });
       document.getElementById('status').textContent = '✅ 已导入 ' + list.length + ' 条';
     };
@@ -1020,7 +1380,650 @@ tr.deleting .del { opacity: 0.7; }
     saveSettings({ stockRate: stockRate, etfRate: etfRate, stockMin: stockMin, etfMin: etfMin });
     closeSettings();
     render();
+    scheduleSyncPush();
   });
+
+  /* -------- 云同步 -------- */
+  var SYNC_CONFIG_KEY = 'portfolio_sync_config';
+  var SYNC_ENDPOINT_KEY = 'portfolio_sync_endpoint';
+  var syncConfig = loadSyncConfig();
+  var syncBusy = false;
+  var syncTimer = null;
+  var syncToastTimer = null;
+  var syncDotState = '';
+
+  function loadSyncConfig() {
+    try {
+      var c = JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY));
+      return (c && typeof c.code === 'string') ? c : null;
+    } catch (e) { return null; }
+  }
+  function saveSyncConfig() {
+    if (syncConfig) localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(syncConfig));
+    else localStorage.removeItem(SYNC_CONFIG_KEY);
+  }
+  function shortHash(str) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return ('00000000' + h.toString(16)).slice(-8);
+  }
+  function markSynced(code) { localStorage.setItem('synced:' + shortHash(code), 'true'); }
+  function hasSyncedMarker(code) { return localStorage.getItem('synced:' + shortHash(code)) === 'true'; }
+  function clearSyncedMarker(code) { localStorage.removeItem('synced:' + shortHash(code)); }
+
+  function syncEndpoint() {
+    var custom = (localStorage.getItem(SYNC_ENDPOINT_KEY) || '').trim();
+    if (custom) return custom.replace(/\/+$/, '');
+    return '/api/sync';
+  }
+  function saveEndpointFromInput() {
+    var el = document.getElementById('syncEndpointInput');
+    if (!el) return;
+    var v = el.value.trim();
+    if (v) localStorage.setItem(SYNC_ENDPOINT_KEY, v.replace(/\/+$/, ''));
+    else localStorage.removeItem(SYNC_ENDPOINT_KEY);
+  }
+  function apiAvailable() {
+    if (localStorage.getItem(SYNC_ENDPOINT_KEY)) return true;
+    if (location.protocol === 'file:') return false;
+    if (/(^|\.)github\.io$/.test(location.hostname)) return false;
+    return true;
+  }
+
+  function apiRequest(method, code, body) {
+    var url = syncEndpoint() + '?code=' + encodeURIComponent(code);
+    var opts = { method: method, cache: 'no-store', headers: {} };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    var ctrl = null, timer = null;
+    if (typeof AbortController !== 'undefined') {
+      ctrl = new AbortController();
+      opts.signal = ctrl.signal;
+      timer = setTimeout(function () { ctrl.abort(); }, 15000);
+    }
+    return fetch(url, opts).then(function (res) {
+      if (timer) clearTimeout(timer);
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.status === 409) {
+          var err = new Error('云端版本冲突');
+          err.conflict = true;
+          err.remote = data;
+          throw err;
+        }
+        if (!res.ok) throw new Error((data && data.error) || ('服务返回 HTTP ' + res.status));
+        return data;
+      });
+    }).catch(function (err) {
+      if (timer) clearTimeout(timer);
+      if (err && err.name === 'AbortError') throw new Error('请求超时，请检查网络或服务地址');
+      throw err;
+    });
+  }
+
+  function normalizeRemote(remote) {
+    remote = remote || {};
+    var hs = Array.isArray(remote.holdings) ? remote.holdings : [];
+    hs = hs.map(SyncCore.cleanRecord).filter(Boolean);
+    return {
+      rev: Number(remote.rev) || 0,
+      holdings: hs,
+      settings: (remote.settings && typeof remote.settings === 'object') ? remote.settings : null,
+      settingsUpdatedAt: Number(remote.settingsUpdatedAt) || 0,
+      updatedAt: Number(remote.updatedAt) || 0
+    };
+  }
+  function buildDoc() {
+    // cleanRecord 会剥离 lastPrice / lastChangePct 等行情缓存字段
+    // 超过 365 天的墓碑不再上传，避免文档无限膨胀（与云端 TTL 一致）
+    var horizon = Date.now() - 365 * 24 * 60 * 60 * 1000;
+    var holdings = loadRawList().map(SyncCore.cleanRecord).filter(Boolean).filter(function (r) {
+      if (!r.deletedAt) return true;
+      var t = Date.parse(r.updatedAt || r.deletedAt);
+      return isNaN(t) ? true : t > horizon;
+    });
+    return { holdings: holdings, settings: loadSettings(), settingsUpdatedAt: getSettingsUpdatedAt() };
+  }
+  function persistDoc(doc) {
+    doc = doc || {};
+    var list = (doc.holdings || []).map(SyncCore.cleanRecord).filter(Boolean);
+    saveRawList(list);
+    if (doc.settings) applySettings(doc.settings, doc.settingsUpdatedAt || getSettingsUpdatedAt());
+  }
+  function activeCount(doc) { return SyncCore.active(doc.holdings).length; }
+
+  function setSyncDot(state) {
+    syncDotState = state || '';
+    var dot = document.getElementById('syncDot');
+    if (dot) dot.className = 'sync-dot' + (syncDotState ? ' ' + syncDotState : '');
+  }
+  function syncMsg(text, cls) {
+    var el = document.getElementById('syncMsg');
+    el.textContent = text || '';
+    el.className = 'sync-msg' + (cls ? ' ' + cls : '');
+  }
+  function toast(text) {
+    var el = document.getElementById('syncToast');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(syncToastTimer);
+    syncToastTimer = setTimeout(function () { el.classList.remove('show'); }, 2600);
+  }
+
+  function updateSyncUI(message) {
+    var btn = document.getElementById('syncBtn');
+    var unbound = document.getElementById('syncUnbound');
+    var bound = document.getElementById('syncBound');
+    if (syncConfig && syncConfig.code) {
+      btn.classList.add('bound');
+      unbound.style.display = 'none';
+      bound.style.display = 'block';
+      document.getElementById('syncCodeDisplay').textContent = syncConfig.code;
+      var parts = [];
+      if (syncConfig.lastSyncAt) parts.push('上次同步 ' + new Date(syncConfig.lastSyncAt).toLocaleString());
+      else parts.push('尚未同步');
+      parts.push('rev ' + (syncConfig.rev || 0));
+      if (message) parts.push(message);
+      document.getElementById('syncState').textContent = parts.join(' · ');
+      if (!syncBusy) setSyncDot(syncDotState || 'ok');
+    } else {
+      btn.classList.remove('bound');
+      unbound.style.display = 'block';
+      bound.style.display = 'none';
+      if (!syncBusy) setSyncDot(syncDotState || '');
+    }
+    updateRestoreRow();
+  }
+
+  function backupKeys() {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('portfolio_backup_') === 0) keys.push(k);
+    }
+    keys.sort();
+    return keys;
+  }
+  function saveBackup(reason, doc) {
+    try {
+      var key = 'portfolio_backup_' + new Date().toISOString().replace(/[:.]/g, '-');
+      localStorage.setItem(key, JSON.stringify({
+        v: 1, at: new Date().toISOString(), reason: reason,
+        holdings: (doc && doc.holdings) || [],
+        settings: (doc && doc.settings) || null,
+        settingsUpdatedAt: (doc && doc.settingsUpdatedAt) || 0
+      }));
+      var keys = backupKeys();
+      while (keys.length > 5) localStorage.removeItem(keys.shift());
+      updateRestoreRow();
+      return key;
+    } catch (e) { return null; }
+  }
+  function backupLocal(reason) { return saveBackup(reason, buildDoc()); }
+  function updateRestoreRow() {
+    var row = document.getElementById('syncRestoreRow');
+    if (row) row.style.display = backupKeys().length ? 'block' : 'none';
+  }
+
+  function showChoice(title, bodyHtml, actions) {
+    document.getElementById('syncChoiceTitle').textContent = title;
+    document.getElementById('syncChoiceBody').innerHTML = bodyHtml;
+    var box = document.getElementById('syncChoiceActions');
+    box.innerHTML = '';
+    (actions || []).forEach(function (a) {
+      var b = document.createElement('button');
+      b.className = a.primary ? 'sync-primary-btn' : 'sync-secondary-btn';
+      b.textContent = a.label;
+      if (a.disabled) b.disabled = true;
+      b.addEventListener('click', a.onClick);
+      box.appendChild(b);
+    });
+    document.getElementById('syncChoiceOverlay').classList.add('show');
+  }
+
+  function setSyncBusy(b) {
+    syncBusy = b;
+    ['syncGenerateBtn', 'syncConnectBtn', 'syncNowBtn'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.disabled = b;
+    });
+    if (b) setSyncDot('busy');
+    else if (syncDotState === 'busy') setSyncDot(syncConfig ? 'ok' : '');
+  }
+
+  function beginConnect(code) {
+    if (!apiAvailable()) {
+      syncMsg('当前页面无法访问同步服务。请把页面部署到 Cloudflare Pages，或在“高级”里填写服务地址。', 'err');
+      return;
+    }
+    setSyncBusy(true);
+    syncMsg('正在检查云端…', 'info');
+    apiRequest('GET', code).then(function (remote) {
+      setSyncBusy(false);
+      syncMsg('');
+      handleRemote(code, normalizeRemote(remote));
+    }).catch(function (err) {
+      setSyncBusy(false);
+      setSyncDot('err');
+      syncMsg('❌ 连接失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function handleRemote(code, remoteDoc) {
+    var localDoc = buildDoc();
+    var lc = activeCount(localDoc);
+    var rc = activeCount(remoteDoc);
+    document.getElementById('syncCodeInput').value = code;
+
+    if (lc === 0 && rc === 0) {
+      bindSync(code, remoteDoc.rev, '已连接（两端均为空）');
+      return;
+    }
+
+    if (rc === 0) {
+      showChoice('云端为空',
+        '检测到本地有 <b>' + lc + '</b> 条持仓。<br>是否将本地数据上传为云端的初始数据？',
+        [
+          { label: '上传为初始数据', primary: true, onClick: function () { closeSyncChoice(); uploadInitial(code, remoteDoc); } },
+          { label: '取消', onClick: closeSyncChoice }
+        ]);
+      return;
+    }
+
+    if (lc === 0) {
+      backupLocal('绑定前自动备份');
+      persistDoc(remoteDoc);
+      render();
+      bindSync(code, remoteDoc.rev, '已从云端导入 ' + rc + ' 条');
+      toast('已从云端导入 ' + rc + ' 条');
+      return;
+    }
+
+    showChoice('两端都有数据',
+      '本地 <b>' + lc + '</b> 条，云端 <b>' + rc + '</b> 条。<br>请选择处理方式（操作前会自动备份）：',
+      [
+        { label: '合并（按 ID）', onClick: function () { closeSyncChoice(); mergeFirst(code, localDoc, remoteDoc); } },
+        { label: '以云端为准（推荐）', primary: true, onClick: function () { closeSyncChoice(); cloudFirst(code, localDoc, remoteDoc); } },
+        { label: '以本地为准', onClick: function () { closeSyncChoice(); localFirst(code, localDoc, remoteDoc); } },
+        { label: '取消', onClick: closeSyncChoice }
+      ]);
+  }
+
+  function bindSync(code, rev, message) {
+    var doc = buildDoc();
+    syncConfig = {
+      code: code,
+      rev: Number(rev) || 0,
+      lastSyncAt: Date.now(),
+      lastPushedHash: SyncCore.docHash(doc)
+    };
+    saveSyncConfig();
+    markSynced(code);
+    setSyncDot('ok');
+    updateSyncUI();
+    syncMsg('✅ ' + message, 'ok');
+    toast(message);
+  }
+
+  function pushUntilSuccess(code, doc, rev, attempt) {
+    return apiRequest('PUT', code, {
+      rev: rev,
+      holdings: doc.holdings,
+      settings: doc.settings,
+      settingsUpdatedAt: doc.settingsUpdatedAt
+    }).then(function (res) {
+      return Number(res.rev) || (rev + 1);
+    }).catch(function (err) {
+      if (err.conflict && attempt < 3) {
+        // 用当前本地数据（而不是旧的请求快照）与云端合并，避免推送期间的新编辑被覆盖
+        var merged = SyncCore.mergeDocs(buildDoc(), normalizeRemote(err.remote));
+        persistDoc(merged);
+        render();
+        syncMsg('检测到云端变化，已自动合并，正在重试…', 'info');
+        return pushUntilSuccess(code, merged, Number(err.remote.rev) || 0, attempt + 1);
+      }
+      throw err;
+    });
+  }
+
+  function pushAuthoritative(code, doc, rev, attempt) {
+    return apiRequest('PUT', code, {
+      rev: rev,
+      holdings: doc.holdings,
+      settings: doc.settings,
+      settingsUpdatedAt: doc.settingsUpdatedAt
+    }).then(function (res) {
+      return Number(res.rev) || (rev + 1);
+    }).catch(function (err) {
+      if (err.conflict && attempt < 3) {
+        var remote = normalizeRemote(err.remote);
+        // 合并推送期间可能产生的新本地编辑
+        var current = buildDoc();
+        var combined = SyncCore.mergeHoldings(doc.holdings, current.holdings);
+        var ids = {};
+        combined.forEach(function (r) { ids[r.id] = true; });
+        var nowIso = new Date().toISOString();
+        var extra = [];
+        remote.holdings.forEach(function (r) {
+          if (!ids[r.id] && !r.deletedAt) {
+            var tomb = SyncCore.cleanRecord(r);
+            tomb.deletedAt = nowIso;
+            tomb.updatedAt = nowIso;
+            extra.push(tomb);
+          }
+        });
+        var next = {
+          holdings: combined.concat(extra),
+          settings: current.settings,
+          settingsUpdatedAt: current.settingsUpdatedAt
+        };
+        persistDoc(next);
+        return pushAuthoritative(code, next, Number(err.remote.rev) || 0, attempt + 1);
+      }
+      throw err;
+    });
+  }
+
+  function uploadInitial(code, remoteDoc) {
+    backupLocal('首次上传前自动备份');
+    var doc = buildDoc();
+    SyncCore.migrateIds(doc.holdings);
+    persistDoc(doc);
+    setSyncBusy(true);
+    syncMsg('正在上传初始数据…', 'info');
+    pushUntilSuccess(code, doc, remoteDoc.rev, 0).then(function (rev) {
+      setSyncBusy(false);
+      render();
+      bindSync(code, rev, '已上传 ' + activeCount(doc) + ' 条');
+    }).catch(function (err) {
+      setSyncBusy(false);
+      setSyncDot('err');
+      syncMsg('❌ 上传失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function mergeFirst(code, localDoc, remoteDoc) {
+    backupLocal('首次合并前自动备份');
+    saveBackup('首次合并前的云端快照', remoteDoc);
+    var migrated = localDoc.holdings.slice();
+    SyncCore.migrateIds(migrated);
+    var merged = SyncCore.mergeDocs(
+      { holdings: migrated, settings: localDoc.settings, settingsUpdatedAt: localDoc.settingsUpdatedAt },
+      remoteDoc
+    );
+    var dup = SyncCore.countDuplicates(merged.holdings);
+    if (dup > 0) {
+      showChoice('发现可能重复',
+        '合并后可能有 <b>' + dup + '</b> 条重复记录（同代码、同数量、同成本，但 ID 不同）。<br>建议改为「以云端为准」，或继续合并后手动清理。',
+        [
+          { label: '仍然合并', primary: true, onClick: function () { closeSyncChoice(); doFirstMerge(code, merged, remoteDoc); } },
+          { label: '改为以云端为准', onClick: function () { closeSyncChoice(); cloudFirst(code, localDoc, remoteDoc); } },
+          { label: '取消', onClick: closeSyncChoice }
+        ]);
+      return;
+    }
+    doFirstMerge(code, merged, remoteDoc);
+  }
+  function doFirstMerge(code, merged, remoteDoc) {
+    persistDoc(merged);
+    render();
+    setSyncBusy(true);
+    syncMsg('正在合并并上传…', 'info');
+    pushUntilSuccess(code, merged, remoteDoc.rev, 0).then(function (rev) {
+      setSyncBusy(false);
+      bindSync(code, rev, '已合并并同步');
+    }).catch(function (err) {
+      setSyncBusy(false);
+      setSyncDot('err');
+      syncMsg('❌ 合并失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function cloudFirst(code, localDoc, remoteDoc) {
+    backupLocal('以云端为准前自动备份');
+    persistDoc(remoteDoc);
+    render();
+    bindSync(code, remoteDoc.rev, '已用云端数据覆盖本地');
+  }
+
+  function localFirst(code, localDoc, remoteDoc) {
+    backupLocal('以本地为准前自动备份');
+    saveBackup('以本地为准前的云端快照', remoteDoc);
+    var doc = {
+      holdings: localDoc.holdings.slice(),
+      settings: localDoc.settings,
+      settingsUpdatedAt: localDoc.settingsUpdatedAt
+    };
+    SyncCore.migrateIds(doc.holdings);
+    var localIds = {};
+    doc.holdings.forEach(function (r) { localIds[r.id] = true; });
+    var nowIso = new Date().toISOString();
+    remoteDoc.holdings.forEach(function (r) {
+      if (!localIds[r.id] && !r.deletedAt) {
+        var tomb = SyncCore.cleanRecord(r);
+        tomb.deletedAt = nowIso;
+        tomb.updatedAt = nowIso;
+        doc.holdings.push(tomb);
+      }
+    });
+    persistDoc(doc);
+    render();
+    setSyncBusy(true);
+    syncMsg('正在上传本地数据…', 'info');
+    pushAuthoritative(code, doc, remoteDoc.rev, 0).then(function (rev) {
+      setSyncBusy(false);
+      bindSync(code, rev, '已用本地数据覆盖云端');
+    }).catch(function (err) {
+      setSyncBusy(false);
+      setSyncDot('err');
+      syncMsg('❌ 上传失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function pushNow(manual) {
+    if (!syncConfig || syncBusy) return;
+    var doc = buildDoc();
+    var hash = SyncCore.docHash(doc);
+    if (!manual && hash === syncConfig.lastPushedHash) {
+      setSyncDot('ok');
+      updateSyncUI('已是最新');
+      return;
+    }
+    setSyncBusy(true);
+    syncMsg('正在同步…', 'info');
+    pushUntilSuccess(syncConfig.code, doc, syncConfig.rev, 0).then(function (rev) {
+      setSyncBusy(false);
+      var latest = buildDoc();
+      syncConfig.rev = rev;
+      syncConfig.lastPushedHash = SyncCore.docHash(latest);
+      syncConfig.lastSyncAt = Date.now();
+      saveSyncConfig();
+      markSynced(syncConfig.code);
+      setSyncDot('ok');
+      updateSyncUI();
+      syncMsg('✅ 已同步到云端', 'ok');
+      if (manual) toast('已同步');
+    }).catch(function (err) {
+      setSyncBusy(false);
+      setSyncDot('err');
+      updateSyncUI('同步失败：' + (err.message || '网络错误'));
+      syncMsg('❌ 同步失败：' + (err.message || '网络错误') + '，联网或下次打开页面时会自动重试', 'err');
+    });
+  }
+
+  function silentSync() {
+    if (!syncConfig || syncBusy) return;
+    if (!apiAvailable()) { setSyncDot(''); return; }
+    setSyncBusy(true);
+    apiRequest('GET', syncConfig.code).then(function (remote) {
+      var rdoc = normalizeRemote(remote);
+      var localDoc = buildDoc();
+      if (rdoc.rev === 0 && rdoc.holdings.length === 0 && !rdoc.settings) {
+        setSyncBusy(false);
+        if (activeCount(localDoc) > 0) {
+          // 云端为空（首次或已过期）：必须强制上传，不能因为 hash 相同而跳过
+          syncConfig.lastPushedHash = '';
+          saveSyncConfig();
+          pushNow(false);
+        } else {
+          syncConfig.rev = 0;
+          syncConfig.lastSyncAt = Date.now();
+          syncConfig.lastPushedHash = SyncCore.docHash(localDoc);
+          saveSyncConfig();
+          setSyncDot('ok');
+          updateSyncUI('已同步');
+        }
+        return;
+      }
+      var merged = SyncCore.mergeDocs(localDoc, rdoc);
+      var mergedHash = SyncCore.docHash(merged);
+      if (mergedHash !== SyncCore.docHash(localDoc)) {
+        persistDoc(merged);
+        render();
+      }
+      syncConfig.rev = rdoc.rev;
+      saveSyncConfig();
+      setSyncBusy(false);
+      if (mergedHash !== SyncCore.docHash(rdoc)) {
+        pushNow(false);
+      } else {
+        syncConfig.lastPushedHash = mergedHash;
+        syncConfig.lastSyncAt = Date.now();
+        saveSyncConfig();
+        setSyncDot('ok');
+        updateSyncUI('已同步');
+      }
+    }).catch(function (err) {
+      setSyncBusy(false);
+      setSyncDot('err');
+      updateSyncUI(navigator.onLine === false ? '离线' : ('同步失败：' + (err.message || '网络错误')));
+      if (navigator.onLine === false) syncMsg('当前离线，本地修改会在联网后自动同步', 'err');
+    });
+  }
+
+  function scheduleSyncPush(delay) {
+    if (!syncConfig || !syncConfig.code) return;
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(function () {
+      syncTimer = null;
+      pushNow(false);
+    }, typeof delay === 'number' ? delay : 5000);
+  }
+
+  function openSync() {
+    document.getElementById('syncEndpointInput').value = localStorage.getItem(SYNC_ENDPOINT_KEY) || '';
+    syncMsg('');
+    updateSyncUI();
+    document.getElementById('syncOverlay').classList.add('show');
+  }
+
+  function generateAndConnect() {
+    if (!apiAvailable()) {
+      syncMsg('当前页面无法访问同步服务。请把页面部署到 Cloudflare Pages，或在“高级”里填写服务地址。', 'err');
+      return;
+    }
+    saveEndpointFromInput();
+    setSyncBusy(true);
+    syncMsg('正在生成同步码…', 'info');
+    var attempts = 0;
+    function tryOnce() {
+      var code = SyncCore.generateCode();
+      apiRequest('GET', code).then(function (remote) {
+        var doc = normalizeRemote(remote);
+        if (doc.rev !== 0 || doc.holdings.length > 0) {
+          if (++attempts < 3) return tryOnce();
+          setSyncBusy(false);
+          setSyncDot('err');
+          syncMsg('生成同步码冲突，请重试', 'err');
+          return;
+        }
+        setSyncBusy(false);
+        document.getElementById('syncCodeInput').value = code;
+        handleRemote(code, doc);
+      }).catch(function (err) {
+        setSyncBusy(false);
+        setSyncDot('err');
+        syncMsg('❌ 生成失败：' + (err.message || '网络错误'), 'err');
+      });
+    }
+    tryOnce();
+  }
+
+  function restoreLatestBackup() {
+    var keys = backupKeys();
+    if (!keys.length) return;
+    var key = keys[keys.length - 1];
+    try {
+      var b = JSON.parse(localStorage.getItem(key));
+      if (!b || !Array.isArray(b.holdings)) throw new Error('备份格式错误');
+      var when = b.at ? new Date(b.at).toLocaleString() : '最近一次';
+      if (!confirm('将用 ' + when + ' 的备份覆盖当前本地数据。\n覆盖前会再自动备份一次，确定吗？')) return;
+      backupLocal('恢复备份前自动备份');
+      saveRawList(b.holdings.map(SyncCore.cleanRecord).filter(Boolean));
+      if (b.settings) applySettings(b.settings, b.settingsUpdatedAt || 0);
+      render();
+      scheduleSyncPush(1000);
+      syncMsg('✅ 已恢复备份' + (syncConfig ? '，正在同步到云端' : ''), 'ok');
+    } catch (e) {
+      syncMsg('❌ 恢复失败：' + e.message, 'err');
+    }
+  }
+
+  function initCloudSync() {
+    updateSyncUI();
+    document.getElementById('syncBtn').addEventListener('click', openSync);
+    document.getElementById('syncGenerateBtn').addEventListener('click', generateAndConnect);
+    document.getElementById('syncConnectBtn').addEventListener('click', function () {
+      var code = SyncCore.normalizeCode(document.getElementById('syncCodeInput').value);
+      if (!code) { syncMsg('同步码格式不正确，应为 SG-XXXX-XXXX-XXXX-XXXX', 'err'); return; }
+      saveEndpointFromInput();
+      beginConnect(code);
+    });
+    document.getElementById('syncCodeInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') document.getElementById('syncConnectBtn').click();
+    });
+    document.getElementById('syncCopyBtn').addEventListener('click', function () {
+      if (!syncConfig) return;
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        toast('复制失败，请手动选择同步码');
+        return;
+      }
+      navigator.clipboard.writeText(syncConfig.code).then(function () {
+        toast('同步码已复制');
+      }).catch(function () {
+        toast('复制失败，请手动选择同步码');
+      });
+    });
+    document.getElementById('syncNowBtn').addEventListener('click', function () {
+      syncMsg('正在同步…', 'info');
+      silentSync();
+    });
+    document.getElementById('syncDisconnectBtn').addEventListener('click', function () {
+      if (!confirm('断开后本机数据会保留，但不再自动同步。确定断开吗？')) return;
+      if (syncConfig) clearSyncedMarker(syncConfig.code);
+      syncConfig = null;
+      saveSyncConfig();
+      setSyncDot('');
+      updateSyncUI();
+      syncMsg('已断开云同步（本地数据保留）', 'info');
+    });
+    document.getElementById('syncRestoreBtn').addEventListener('click', restoreLatestBackup);
+
+    window.addEventListener('online', function () {
+      if (syncConfig) {
+        setSyncDot('busy');
+        setTimeout(function () { silentSync(); }, 800);
+      }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && syncConfig && Date.now() - (syncConfig.lastSyncAt || 0) > 60000) silentSync();
+    });
+
+    if (syncConfig && hasSyncedMarker(syncConfig.code)) {
+      setTimeout(silentSync, 1200);
+    }
+  }
 
   /* -------- 判断 A 股开市时间（北京时间） -------- */
   function isMarketOpen() {
@@ -1041,6 +2044,7 @@ tr.deleting .del { opacity: 0.7; }
     document.getElementById('switchTrack').classList.add('on');
   }
   render();
+  initCloudSync();
   refreshPrices().then(function() { render(); });
   setInterval(function() {
     if (isMarketOpen()) {
@@ -1117,6 +2121,12 @@ function closeInstallOverlay() {
 }
 function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('show');
+}
+function closeSync() {
+  document.getElementById('syncOverlay').classList.remove('show');
+}
+function closeSyncChoice() {
+  document.getElementById('syncChoiceOverlay').classList.remove('show');
 }
 function closeExport() {
   document.getElementById('exportOverlay').classList.remove('show');
