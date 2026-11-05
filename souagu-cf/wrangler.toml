@@ -7,4 +7,4 @@ pages_build_output_dir = "public"
 # deploy.sh 会自动尝试从你的账号里查找并填入。
 [[kv_namespaces]]
 binding = "HOLDINGS"
-id = "REPLACE_WITH_KV_ID"
+id = "f960673b20f94ce5b5795490eb2192d5"

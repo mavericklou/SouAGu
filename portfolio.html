@@ -1411,16 +1411,23 @@ tr.deleting .del { opacity: 0.7; }
   function hasSyncedMarker(code) { return localStorage.getItem('synced:' + shortHash(code)) === 'true'; }
   function clearSyncedMarker(code) { localStorage.removeItem('synced:' + shortHash(code)); }
 
+  // 只填域名时自动补 /api/sync，避免把请求发到首页
+  function normalizeEndpoint(v) {
+    v = String(v || '').trim().replace(/\/+$/, '');
+    if (!v) return '';
+    if (/^https?:\/\/[^/]+$/i.test(v)) return v + '/api/sync';
+    return v;
+  }
   function syncEndpoint() {
-    var custom = (localStorage.getItem(SYNC_ENDPOINT_KEY) || '').trim();
-    if (custom) return custom.replace(/\/+$/, '');
+    var custom = normalizeEndpoint(localStorage.getItem(SYNC_ENDPOINT_KEY));
+    if (custom) return custom;
     return '/api/sync';
   }
   function saveEndpointFromInput() {
     var el = document.getElementById('syncEndpointInput');
     if (!el) return;
-    var v = el.value.trim();
-    if (v) localStorage.setItem(SYNC_ENDPOINT_KEY, v.replace(/\/+$/, ''));
+    var v = normalizeEndpoint(el.value);
+    if (v) localStorage.setItem(SYNC_ENDPOINT_KEY, v);
     else localStorage.removeItem(SYNC_ENDPOINT_KEY);
   }
   function apiAvailable() {
@@ -1428,6 +1435,15 @@ tr.deleting .del { opacity: 0.7; }
     if (location.protocol === 'file:') return false;
     if (/(^|\.)github\.io$/.test(location.hostname)) return false;
     return true;
+  }
+  function syncUnavailableMessage() {
+    if (location.protocol === 'file:') {
+      return '当前页面是以本地文件方式打开的，不能访问同步服务。请部署到 Cloudflare Pages，或在“高级”里填写完整的服务地址（如 https://souagu.pages.dev/api/sync）。';
+    }
+    if (/(^|\.)github\.io$/.test(location.hostname)) {
+      return 'GitHub Pages 域名默认不放行云同步。请展开“高级：自定义服务地址”，填写 https://你的域名/api/sync（输入后会自动保存），再点一次。';
+    }
+    return '当前页面无法访问同步服务，请在“高级”里填写完整的服务地址。';
   }
 
   function apiRequest(method, code, body) {
@@ -1594,7 +1610,7 @@ tr.deleting .del { opacity: 0.7; }
 
   function beginConnect(code) {
     if (!apiAvailable()) {
-      syncMsg('当前页面无法访问同步服务。请把页面部署到 Cloudflare Pages，或在“高级”里填写服务地址。', 'err');
+      syncMsg(syncUnavailableMessage(), 'err');
       return;
     }
     setSyncBusy(true);
@@ -1919,11 +1935,12 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function generateAndConnect() {
+    // 先保存输入框里的自定义地址，再判断是否可用（否则刚填的地址还没进 localStorage）
+    saveEndpointFromInput();
     if (!apiAvailable()) {
-      syncMsg('当前页面无法访问同步服务。请把页面部署到 Cloudflare Pages，或在“高级”里填写服务地址。', 'err');
+      syncMsg(syncUnavailableMessage(), 'err');
       return;
     }
-    saveEndpointFromInput();
     setSyncBusy(true);
     syncMsg('正在生成同步码…', 'info');
     var attempts = 0;
@@ -1983,6 +2000,9 @@ tr.deleting .del { opacity: 0.7; }
     document.getElementById('syncCodeInput').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') document.getElementById('syncConnectBtn').click();
     });
+    // 自定义服务地址：输入时即时保存，避免填完后没点“连接”就点“生成”时报不可用
+    document.getElementById('syncEndpointInput').addEventListener('input', saveEndpointFromInput);
+    document.getElementById('syncEndpointInput').addEventListener('change', saveEndpointFromInput);
     document.getElementById('syncCopyBtn').addEventListener('click', function () {
       if (!syncConfig) return;
       if (!navigator.clipboard || !navigator.clipboard.writeText) {

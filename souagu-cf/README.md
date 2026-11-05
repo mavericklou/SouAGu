@@ -40,6 +40,8 @@ npx wrangler pages project create souagu --production-branch main
 
 部署完成后访问 `https://souagu.pages.dev`（或分配到的域名），点页面右上角「同步」即可。
 
+> 如果你暂时还在 GitHub Pages（`*.github.io`）上使用，该域名默认不放行云同步：展开「高级：自定义服务地址」，填写 `https://souagu.pages.dev/api/sync`（只填域名也会自动补 `/api/sync`，输入即保存），保存后再点「生成新同步码」。
+
 ### 如果 KV 绑定没有生效
 
 Dashboard → Workers & Pages → `souagu` → Settings → Functions → **KV namespace bindings**：
@@ -48,6 +50,11 @@ Dashboard → Workers & Pages → `souagu` → Settings → Functions → **KV n
 - KV namespace: 选择第 2 步创建的
 
 绑定后**必须重新部署一次**（`./deploy.sh`）。
+
+### 常见问题
+
+- **提示「当前页面无法访问同步服务」**：说明页面运行在 `file://` 或 `*.github.io` 下且没有保存自定义地址。请展开「高级」，填写 `https://你的域名/api/sync`（只填域名会自动补 `/api/sync`），输入后即自动保存，再点生成/连接。
+- **提示「服务返回 HTTP 404」**：自定义地址路径不对，或 Pages Function 尚未随静态文件一起部署。确认地址是 `https://你的域名/api/sync`，并重新执行 `./deploy.sh`。
 
 ### 自定义域名
 
