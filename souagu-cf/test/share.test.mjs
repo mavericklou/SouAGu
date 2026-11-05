@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequestGet as getSync, onRequestPut as putSync } from '../functions/api/sync.js';
+import { onRequestGet as getShared } from '../functions/api/shared.js';
 import {
   onRequestGet as getShareState,
   onRequestPost as createShare,
@@ -12,6 +13,7 @@ const OWNER2 = 'SG-4DEF-5GHJ-6KLM-7NPQ';
 const SHARE_A = 'SC-2ABC-3DEF-4GHJ-5KLM';
 const SHARE_B = 'SC-9NPQ-8RST-7UVW-6XYZ';
 const BASE = 'https://souagu.pages.dev/api/sync';
+const SHARED_BASE = 'https://souagu.pages.dev/api/shared';
 const SHARE_BASE = 'https://souagu.pages.dev/api/share';
 
 function makeEnv() {
@@ -65,6 +67,10 @@ function writeSync(env, code, body) {
   return putSync({ request: request(`${BASE}?code=${encodeURIComponent(code)}`, 'PUT', body), env });
 }
 
+function readShared(env, code) {
+  return getShared({ request: request(`${SHARED_BASE}?code=${encodeURIComponent(code)}`), env });
+}
+
 function readShareState(env, code) {
   return getShareState({ request: request(`${SHARE_BASE}?code=${encodeURIComponent(code)}`), env });
 }
@@ -91,7 +97,7 @@ test('主档正常读写，响应带 readOnly:false', async () => {
   assert.equal(body.holdings.length, 1);
 });
 
-test('生成分享码后：分享端只读、过滤墓碑、不能 PUT', async () => {
+test('生成分享码后：只读接口返回数据、过滤墓碑、分享码不能 PUT', async () => {
   const env = makeEnv();
   await seed(env, OWNER, [
     record(),
@@ -101,7 +107,11 @@ test('生成分享码后：分享端只读、过滤墓碑、不能 PUT', async (
   const created = await (await create(env, OWNER, SHARE_A)).json();
   assert.equal(created.shareCode, SHARE_A);
 
-  const res = await readSync(env, SHARE_A);
+  // /api/sync 不再读取分享码
+  const wrongApi = await readSync(env, SHARE_A);
+  assert.equal(wrongApi.status, 400);
+
+  const res = await readShared(env, SHARE_A);
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.readOnly, true);
@@ -119,18 +129,18 @@ test('生成分享码后：分享端只读、过滤墓碑、不能 PUT', async (
   assert.equal(deniedRaw.status, 403);
 });
 
-test('分享码可省略横线 / 小写；裸 16 位码也能识别为分享码', async () => {
+test('分享码可省略横线 / 小写；只读接口拒绝主码和裸码', async () => {
   const env = makeEnv();
   await seed(env);
   await create(env, OWNER, SHARE_B);
 
-  const a = await (await readSync(env, 'sc9npq8rst7uvw6xyz')).json();
+  const a = await (await readShared(env, 'sc9npq8rst7uvw6xyz')).json();
   assert.equal(a.readOnly, true);
+  assert.equal(a.shareCode, SHARE_B);
 
   const raw = SHARE_B.replace(/^SC-/, '').replace(/-/g, '');
-  const b = await (await readSync(env, raw)).json();
-  assert.equal(b.readOnly, true);
-  assert.equal(b.shareCode, SHARE_B);
+  assert.equal((await readShared(env, raw)).status, 400);
+  assert.equal((await readShared(env, OWNER)).status, 400);
 });
 
 test('轮换后旧分享码立即失效，只有一个有效码', async () => {
@@ -139,8 +149,8 @@ test('轮换后旧分享码立即失效，只有一个有效码', async () => {
   await create(env, OWNER, SHARE_A);
   await create(env, OWNER, SHARE_B);
 
-  assert.equal((await readSync(env, SHARE_A)).status, 404);
-  assert.equal((await readSync(env, SHARE_B)).status, 200);
+  assert.equal((await readShared(env, SHARE_A)).status, 404);
+  assert.equal((await readShared(env, SHARE_B)).status, 200);
 });
 
 test('撤销分享码后失效，状态为未配置', async () => {
@@ -154,7 +164,7 @@ test('撤销分享码后失效，状态为未配置', async () => {
   const res = await (await revoke(env, OWNER)).json();
   assert.equal(res.revoked, true);
 
-  assert.equal((await readSync(env, SHARE_A)).status, 404);
+  assert.equal((await readShared(env, SHARE_A)).status, 404);
   const after = await (await readShareState(env, OWNER)).json();
   assert.equal(after.configured, false);
 

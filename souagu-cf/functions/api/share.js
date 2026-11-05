@@ -9,12 +9,13 @@
  * 分享端 GET 会校验该指针，旧码即使映射残留也会被拒绝。
  */
 
-const CODE_LENGTH = 16;
-const OWNER_PREFIX = 'SG';
-const SHARE_PREFIX = 'SC';
-const OWNER_KEY_PREFIX = 'holdings:';
-const SHARE_KEY_PREFIX = 'share:';
-const OWNER_SHARE_KEY_PREFIX = 'shareOwner:';
+import {
+  parseCode,
+  sha256Hex,
+  ownerKey,
+  shareKey,
+  ownerShareKey
+} from '../_lib/share.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,35 +36,6 @@ function json(body, status = 200) {
     }
   });
 }
-
-function parseCode(input) {
-  let s = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  let kind = 'owner';
-  let explicit = false;
-
-  if (s.length === 18 && (s.startsWith(OWNER_PREFIX) || s.startsWith(SHARE_PREFIX))) {
-    kind = s.startsWith(SHARE_PREFIX) ? 'share' : 'owner';
-    explicit = true;
-    s = s.slice(2);
-  }
-
-  if (s.length !== CODE_LENGTH || !/^[A-HJ-NP-Z2-9]+$/.test(s)) return null;
-
-  const prefix = kind === 'share' ? SHARE_PREFIX : OWNER_PREFIX;
-  return { kind, explicit, raw: s, code: prefix + '-' + s.match(/.{4}/g).join('-') };
-}
-
-async function sha256Hex(value) {
-  const data = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function ownerKey(hash) { return OWNER_KEY_PREFIX + hash; }
-function shareKey(hash) { return SHARE_KEY_PREFIX + hash; }
-function ownerShareKey(hash) { return OWNER_SHARE_KEY_PREFIX + hash; }
 
 function ownerFromRequest(request) {
   const url = new URL(request.url);
