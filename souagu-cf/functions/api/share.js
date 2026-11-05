@@ -1,8 +1,8 @@
 /**
  * 持仓助手 — 分享码管理
  *
- *   GET    /api/share?code=SG-...     查询当前主档是否已生成分享码（不返回明文）
- *   POST   /api/share?code=SG-...     body { shareCode: "SC-..." } 生成 / 轮换分享码
+ *   GET    /api/share?code=SG-...     查询当前主档的分享码（返回明文，供多设备显示同一链接）
+ *   POST   /api/share?code=SG-...     body { shareCode: "SC-...", shareName?: "..." } 生成 / 轮换 / 改名
  *   DELETE /api/share?code=SG-...     撤销当前分享码
  *
  * 同一个主档同时只有一个有效分享码：shareOwner 指针指向当前分享码，
@@ -14,7 +14,8 @@ import {
   sha256Hex,
   ownerKey,
   shareKey,
-  ownerShareKey
+  ownerShareKey,
+  cleanShareName
 } from '../_lib/share.js';
 
 const CORS_HEADERS = {
@@ -63,6 +64,8 @@ export async function onRequestGet({ request, env }) {
     const ptr = await env.HOLDINGS.get(ownerShareKey(ownerHash), 'json');
     return json({
       configured: !!(ptr && ptr.share),
+      shareCode: ptr && ptr.code ? ptr.code : null,
+      shareName: ptr ? cleanShareName(ptr.name) : '',
       createdAt: ptr ? (Number(ptr.createdAt) || 0) : 0
     });
   } catch (err) {
@@ -87,6 +90,7 @@ export async function onRequestPost({ request, env }) {
   if (!share || share.kind !== 'share') {
     return json({ error: '分享码格式不正确，应为 SC-XXXX-XXXX-XXXX-XXXX' }, 400);
   }
+  const shareName = cleanShareName(body && body.shareName);
 
   try {
     const ownerHash = await sha256Hex(owner.code);
@@ -104,15 +108,15 @@ export async function onRequestPost({ request, env }) {
     const prev = await env.HOLDINGS.get(ownerShareKey(ownerHash), 'json');
     const now = Date.now();
 
-    await env.HOLDINGS.put(shareKey(shareHash), JSON.stringify({ owner: ownerHash, createdAt: now }));
-    await env.HOLDINGS.put(ownerShareKey(ownerHash), JSON.stringify({ share: shareHash, createdAt: now }));
+    await env.HOLDINGS.put(shareKey(shareHash), JSON.stringify({ owner: ownerHash, createdAt: now, name: shareName }));
+    await env.HOLDINGS.put(ownerShareKey(ownerHash), JSON.stringify({ share: shareHash, code: share.code, createdAt: now, name: shareName }));
 
     // 轮换后删除旧映射；即使删除失败，分享端也会因指针不匹配而拒绝旧码
     if (prev && prev.share && prev.share !== shareHash) {
       try { await env.HOLDINGS.delete(shareKey(prev.share)); } catch (err) { /* 忽略 */ }
     }
 
-    return json({ shareCode: share.code, createdAt: now });
+    return json({ shareCode: share.code, shareName, createdAt: now });
   } catch (err) {
     return json({ error: '生成分享码失败' }, 500);
   }

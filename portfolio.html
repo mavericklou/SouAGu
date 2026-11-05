@@ -139,6 +139,11 @@ tr.deleting .del { opacity: 0.7; }
 .sync-dot.err { background: #e74c3c; }
 .sync-dot.busy { background: #f5a623; }
 .table-actions { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+.profile-select {
+  max-width: 132px; padding: 7px 9px; border: 1px solid #ddd; border-radius: 8px;
+  background: #fff; color: #333; font-size: 12px; outline: none; cursor: pointer;
+}
+.profile-select:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.12); }
 
 /* -------- 导出/导入弹窗 -------- */
 .export-overlay {
@@ -212,6 +217,13 @@ tr.deleting .del { opacity: 0.7; }
 }
 .sync-mini-btn:hover { background: #f0f0f0; }
 .sync-state { font-size: 12px; color: #999; margin: 10px 0 16px; min-height: 18px; line-height: 1.6; }
+.sync-name-row { display: flex; align-items: center; gap: 8px; margin: -2px 0 12px; }
+.sync-name-row label { font-size: 12px; color: #999; white-space: nowrap; }
+.sync-name-row input {
+  flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid #e0e0e0; border-radius: 7px;
+  font-size: 12px; color: #333; outline: none;
+}
+.sync-name-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.12); }
 .sync-bound-actions { display: flex; gap: 8px; }
 .sync-bound-actions .sync-primary-btn { flex: 1; width: auto; }
 .sync-msg { font-size: 12px; margin-top: 12px; line-height: 1.6; min-height: 16px; word-break: break-word; }
@@ -385,6 +397,10 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
 
     <!-- 未绑定 -->
     <div id="syncUnbound">
+      <div id="syncAddNameRow" class="sync-name-row" style="display:none">
+        <label for="syncNewNameInput">主码昵称</label>
+        <input id="syncNewNameInput" type="text" maxlength="12" placeholder="可选，如：主观交易">
+      </div>
       <p class="sync-desc">用同一个主同步码在多台设备间读写同步。<b>主同步码等同于密码</b>，请妥善保管，丢失后无法找回；任何拿到它的人都能读写你的数据。<br>只读分享请使用下方生成的分享链接，不要用分享码连接。</p>
       <button id="syncGenerateBtn" class="sync-primary-btn">生成新同步码</button>
       <div class="sync-divider"><span>或使用已有同步码</span></div>
@@ -405,6 +421,11 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
         <span id="syncCodeDisplay"></span>
         <button id="syncCopyBtn" class="sync-mini-btn">复制</button>
       </div>
+      <div class="sync-name-row">
+        <label for="syncNameInput">主码昵称</label>
+        <input id="syncNameInput" type="text" maxlength="12" placeholder="可选，如：主观交易">
+        <button id="syncNameSaveBtn" class="sync-mini-btn">保存</button>
+      </div>
       <div id="syncState" class="sync-state">尚未同步</div>
       <div class="sync-bound-actions">
         <button id="syncNowBtn" class="sync-primary-btn">立即同步</button>
@@ -415,6 +436,11 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       <div id="syncShareBox" class="sync-share-box" style="display:none">
         <div class="sync-share-head">👁 只读分享</div>
         <p class="sync-share-desc">生成只读链接发给对方。对方打开后只能查看（含成本价），不能修改，也不会影响对方自己的持仓和同步码。链接包含分享码，请只发给信任的人。</p>
+        <div class="sync-name-row">
+          <label for="syncShareNameInput">分享说明</label>
+          <input id="syncShareNameInput" type="text" maxlength="60" placeholder="可选，如：张三的主观交易策略">
+          <button id="syncShareNameSaveBtn" class="sync-mini-btn" style="display:none">保存说明</button>
+        </div>
         <div id="syncShareCodeRow" class="sync-code-row" style="display:none">
           <span id="syncShareCodeDisplay"></span>
           <button id="syncShareCopyBtn" class="sync-mini-btn">复制码</button>
@@ -454,6 +480,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
 <div id="headerRow" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
   <h1>📊 持仓助手</h1>
   <div class="table-actions">
+    <select id="profileSelect" class="profile-select" title="切换主码" aria-label="切换主码" style="display:none"></select>
     <button id="syncBtn" title="云端同步"><span class="sync-dot" id="syncDot"></span>同步</button>
     <button id="exportBtn" title="导出持仓数据">导出</button>
     <button id="importBtn" title="导入持仓数据">导入</button>
@@ -911,6 +938,105 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   /* -------- 费率设置 -------- */
   var SETTINGS_KEY = 'portfolio_fee_settings';
   var SETTINGS_UPDATED_KEY = 'portfolio_fee_settings_updated_at';
+
+  /* -------- 多主码档案 --------
+   * 每个主码拥有独立的本地持仓/费率档案，切换时整页重载，避免数据互相合并。
+   * 第一个（迁移而来的）档案继续使用旧 key，保证老用户数据不丢。
+   */
+  var PROFILES_KEY = 'portfolio_sync_profiles';
+  var ACTIVE_PROFILE_KEY = 'portfolio_sync_active';
+  var PENDING_CONNECT_KEY = 'portfolio_pending_connect';
+  var profiles = [];
+  var activeProfile = null;
+  var addProfileMode = false;
+
+  function cleanProfileName(value) {
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim().slice(0, 12);
+  }
+  function findProfile(code) {
+    for (var i = 0; i < profiles.length; i++) {
+      if (profiles[i].code === code) return profiles[i];
+    }
+    return null;
+  }
+  function profileKeys(p) {
+    if (!p || p.legacy) {
+      return {
+        holdings: 'portfolio_holdings',
+        settings: 'portfolio_fee_settings',
+        settingsUpdated: 'portfolio_fee_settings_updated_at',
+        config: 'portfolio_sync_config'
+      };
+    }
+    var sid = p.sid || shortHash(p.code);
+    return {
+      holdings: 'portfolio_holdings_' + sid,
+      settings: 'portfolio_fee_settings_' + sid,
+      settingsUpdated: 'portfolio_fee_settings_updated_at_' + sid,
+      config: 'portfolio_sync_config_' + sid
+    };
+  }
+  function readProfilesRaw() {
+    var list = [];
+    try { list = JSON.parse(localStorage.getItem(PROFILES_KEY)) || []; } catch (e) { list = []; }
+    if (!Array.isArray(list)) return [];
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      if (!p || typeof p.code !== 'string') continue;
+      var code = SyncCore.normalizeCode(p.code);
+      if (!code || seen[code]) continue;
+      seen[code] = true;
+      out.push({
+        code: code,
+        name: cleanProfileName(p.name),
+        createdAt: Number(p.createdAt) || 0,
+        legacy: !!p.legacy,
+        sid: p.sid ? String(p.sid) : shortHash(code)
+      });
+    }
+    return out;
+  }
+  function saveProfiles() {
+    if (previewMode) return;
+    try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch (e) {}
+  }
+  function applyProfileKeys() {
+    var keys = profileKeys(activeProfile);
+    STORAGE_KEY = keys.holdings;
+    SETTINGS_KEY = keys.settings;
+    SETTINGS_UPDATED_KEY = keys.settingsUpdated;
+  }
+  function initProfiles() {
+    if (previewMode) return;
+    profiles = readProfilesRaw();
+    // 老用户迁移：把唯一的旧同步配置变成第一个档案
+    if (!profiles.length) {
+      var oldCfg = null;
+      try { oldCfg = JSON.parse(localStorage.getItem('portfolio_sync_config')); } catch (e) {}
+      var oldCode = oldCfg && SyncCore.normalizeCode(oldCfg.code);
+      if (oldCode) {
+        profiles.push({
+          code: oldCode,
+          name: '',
+          createdAt: Number(oldCfg.createdAt) || Date.now(),
+          legacy: true,
+          sid: shortHash(oldCode)
+        });
+      }
+    }
+    var activeCode = '';
+    try { activeCode = localStorage.getItem(ACTIVE_PROFILE_KEY) || ''; } catch (e) {}
+    activeProfile = findProfile(activeCode) || profiles[0] || null;
+    if (activeProfile) {
+      try { localStorage.setItem(ACTIVE_PROFILE_KEY, activeProfile.code); } catch (e) {}
+    }
+    applyProfileKeys();
+    saveProfiles();
+  }
+  initProfiles();
+
   function defaultSettings() {
     return { stockRate: 1, etfRate: 1, stockMin: 5, etfMin: 0.5 };
   }
@@ -1517,7 +1643,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   });
 
   /* -------- 云同步 -------- */
-  var SYNC_CONFIG_KEY = 'portfolio_sync_config';
+  var SYNC_CONFIG_KEY = profileKeys(activeProfile).config;
   var SYNC_ENDPOINT_KEY = 'portfolio_sync_endpoint';
   var syncConfig = loadSyncConfig();
   var syncBusy = false;
@@ -1533,7 +1659,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       if (!c || typeof c.code !== 'string') return null;
       // 旧版“只读分享连接”配置已废弃：分享改用 #share= 预览链接，不落配置
       if (c.mode === 'reader' || /^SC-/i.test(c.code)) {
-        localStorage.removeItem(SYNC_CONFIG_KEY);
+        if (!previewMode) localStorage.removeItem(SYNC_CONFIG_KEY);
         return null;
       }
       var code = SyncCore.normalizeCode(c.code);
@@ -1547,6 +1673,90 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     if (previewMode) return;
     if (syncConfig) localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(syncConfig));
     else localStorage.removeItem(SYNC_CONFIG_KEY);
+  }
+
+  /* -------- 主码切换器 -------- */
+  function renderProfileSelect() {
+    var sel = document.getElementById('profileSelect');
+    if (!sel) return;
+    if (previewMode || readOnlyMode || !profiles.length) {
+      sel.style.display = 'none';
+      return;
+    }
+    sel.innerHTML = '';
+    profiles.forEach(function (p) {
+      var o = document.createElement('option');
+      o.value = p.code;
+      o.textContent = p.name || ('主码 ' + p.code.slice(-4));
+      if (activeProfile && p.code === activeProfile.code) o.selected = true;
+      sel.appendChild(o);
+    });
+    var add = document.createElement('option');
+    add.value = '__add__';
+    add.textContent = '＋ 添加主码…';
+    sel.appendChild(add);
+    sel.style.display = '';
+  }
+  // 绑定成功后把当前主码登记到档案列表（首次绑定时创建档案）
+  function registerActiveProfile(code) {
+    if (previewMode || !code) return;
+    if (!activeProfile) {
+      activeProfile = {
+        code: code,
+        name: '',
+        createdAt: Date.now(),
+        legacy: profiles.length === 0,
+        sid: shortHash(code)
+      };
+      profiles.push(activeProfile);
+    } else if (activeProfile.code !== code) {
+      activeProfile.code = code;
+    }
+    try { localStorage.setItem(ACTIVE_PROFILE_KEY, activeProfile.code); } catch (e) {}
+    saveProfiles();
+    renderProfileSelect();
+  }
+  function saveProfileName() {
+    if (!activeProfile) return;
+    var input = document.getElementById('syncNameInput');
+    activeProfile.name = cleanProfileName(input ? input.value : '');
+    saveProfiles();
+    renderProfileSelect();
+    toast(activeProfile.name ? '主码昵称已保存' : '已清空主码昵称');
+  }
+  function switchProfile(code) {
+    if (!code || (activeProfile && activeProfile.code === code)) return;
+    var p = findProfile(code);
+    if (!p) return;
+    try { localStorage.setItem(ACTIVE_PROFILE_KEY, p.code); } catch (e) {}
+    saveProfiles();
+    location.reload();
+  }
+  // 添加主码：先建立空档案，重载后自动进入首次连接流程，绝不复制当前持仓
+  function prepareAddProfile(code, name) {
+    var existing = findProfile(code);
+    if (existing) {
+      if (name) existing.name = cleanProfileName(name);
+      saveProfiles();
+      try { localStorage.setItem(ACTIVE_PROFILE_KEY, existing.code); } catch (e) {}
+      location.reload();
+      return;
+    }
+    var p = {
+      code: code,
+      name: cleanProfileName(name),
+      createdAt: Date.now(),
+      legacy: profiles.length === 0 && !activeProfile,
+      sid: shortHash(code)
+    };
+    profiles.push(p);
+    activeProfile = p;
+    saveProfiles();
+    try {
+      localStorage.setItem(ACTIVE_PROFILE_KEY, p.code);
+      localStorage.setItem(PENDING_CONNECT_KEY, p.code);
+    } catch (e) {}
+    location.reload();
   }
   function shortHash(str) {
     var h = 0x811c9dc5;
@@ -1706,7 +1916,10 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       text.textContent = '⚠️ 分享已失效 · 显示最后一次数据';
     } else {
       var when = doc && doc.updatedAt ? new Date(doc.updatedAt).toLocaleString() : '';
-      text.textContent = '👁 只读分享 · 数据由分享者更新' + (when ? ' · 更新于 ' + when : '');
+      var shareName = (doc && doc.shareName) || '';
+      text.textContent = shareName
+        ? '👁 ' + shareName + ' · 只读分享' + (when ? ' · 更新于 ' + when : '')
+        : '👁 只读分享 · 数据由分享者更新' + (when ? ' · 更新于 ' + when : '');
     }
   }
 
@@ -1734,6 +1947,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       previewState.status = 'ready';
       previewState.error = '';
       previewState.lastFetchAt = Date.now();
+      document.title = (doc.shareName ? doc.shareName + ' · ' : '') + '持仓助手（只读）';
       updatePreviewBanner('ready');
       render();
       refreshPrices().then(function () { render(); });
@@ -1794,7 +2008,8 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       settingsUpdatedAt: Number(remote.settingsUpdatedAt) || 0,
       updatedAt: Number(remote.updatedAt) || 0,
       readOnly: !!remote.readOnly,
-      shareCode: typeof remote.shareCode === 'string' ? remote.shareCode : null
+      shareCode: typeof remote.shareCode === 'string' ? remote.shareCode : null,
+      shareName: typeof remote.shareName === 'string' ? remote.shareName : ''
     };
   }
   function buildDoc() {
@@ -1843,6 +2058,10 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       unbound.style.display = 'none';
       bound.style.display = 'block';
       document.getElementById('syncCodeDisplay').textContent = syncConfig.code;
+      var nameInput = document.getElementById('syncNameInput');
+      if (nameInput && document.activeElement !== nameInput) {
+        nameInput.value = activeProfile ? (activeProfile.name || '') : '';
+      }
       document.getElementById('syncNowBtn').textContent = '立即同步';
       document.getElementById('syncShareBox').style.display = 'block';
       var parts = [];
@@ -1864,17 +2083,26 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
 
   function backupKeys() {
     var keys = [];
+    var prefix = backupPrefix();
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
-      if (k && k.indexOf('portfolio_backup_') === 0) keys.push(k);
+      if (!k || k.indexOf(prefix) !== 0) continue;
+      // 旧档案没有后缀，不能把其他主码的 portfolio_backup_<sid>_ 备份算进来
+      if (prefix === 'portfolio_backup_' && /^portfolio_backup_[0-9a-f]{8}_/.test(k)) continue;
+      keys.push(k);
     }
     keys.sort();
     return keys;
   }
+  // 每个主码档案使用独立的备份命名空间，恢复时不会串档
+  function backupPrefix() {
+    if (activeProfile && !activeProfile.legacy) return 'portfolio_backup_' + (activeProfile.sid || shortHash(activeProfile.code)) + '_';
+    return 'portfolio_backup_';
+  }
   function saveBackup(reason, doc) {
     if (previewMode) return null;
     try {
-      var key = 'portfolio_backup_' + new Date().toISOString().replace(/[:.]/g, '-');
+      var key = backupPrefix() + new Date().toISOString().replace(/[:.]/g, '-');
       localStorage.setItem(key, JSON.stringify({
         v: 1, at: new Date().toISOString(), reason: reason,
         holdings: (doc && doc.holdings) || [],
@@ -1980,6 +2208,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   function bindSync(code, rev, message) {
     var doc = buildDoc();
     var prev = syncConfig;
+    registerActiveProfile(code);
     syncConfig = {
       code: code,
       mode: 'owner',
@@ -1987,7 +2216,8 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       lastSyncAt: Date.now(),
       lastPushedHash: SyncCore.docHash(doc),
       shareCode: (prev && prev.code === code) ? (prev.shareCode || null) : null,
-      shareCreatedAt: (prev && prev.code === code) ? (prev.shareCreatedAt || 0) : 0
+      shareCreatedAt: (prev && prev.code === code) ? (prev.shareCreatedAt || 0) : 0,
+      shareName: (prev && prev.code === code) ? (prev.shareName || '') : ''
     };
     saveSyncConfig();
     markSynced(code);
@@ -2022,6 +2252,15 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       document.getElementById('importOverlay').classList.remove('show');
       document.getElementById('importConfirmOverlay').classList.remove('show');
     }
+    renderProfileSelect();
+  }
+
+  function cleanShareNameInput(value) {
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim().slice(0, 60);
+  }
+  function readShareNameInput() {
+    var input = document.getElementById('syncShareNameInput');
+    return cleanShareNameInput(input ? input.value : '');
   }
 
   function renderShareBox(status) {
@@ -2031,18 +2270,23 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     box.style.display = bound ? 'block' : 'none';
     if (!bound) return;
     var code = syncConfig.shareCode || '';
+    var name = syncConfig.shareName || '';
     var link = code ? buildShareLink(code) : '';
+    var nameInput = document.getElementById('syncShareNameInput');
+    if (nameInput && document.activeElement !== nameInput) nameInput.value = name;
     document.getElementById('syncShareCodeRow').style.display = code ? 'flex' : 'none';
     document.getElementById('syncShareCodeDisplay').textContent = code;
     document.getElementById('syncShareLinkRow').style.display = code ? 'flex' : 'none';
     document.getElementById('syncShareLinkInput').value = link;
     document.getElementById('syncShareOpenBtn').style.display = code ? 'block' : 'none';
+    document.getElementById('syncShareNameSaveBtn').style.display = code ? 'inline' : 'none';
     document.getElementById('syncShareGenBtn').textContent = code ? '重新生成（旧链接失效）' : '生成分享链接';
     document.getElementById('syncShareRevokeBtn').style.display = code ? 'inline' : 'none';
     var text = '尚未生成分享链接。';
-    if (status === 'remote') text = '分享链接已在其他设备生成；本机无法显示明文链接。重新生成会使旧链接立即失效。';
-    else if (status === 'error') text = '分享服务不可用，请确认 Pages Function 已重新部署（需要 /api/shared）。';
+    if (status === 'error') text = '分享服务不可用，请确认 Pages Function 已重新部署（需要 /api/share 与 /api/shared）。';
+    else if (status === 'legacy') text = '该分享码由旧版本生成，重新生成一次即可在本机和其他设备显示完整链接。';
     else if (status === 'revoked') text = '分享链接已撤销。';
+    else if (code && name) text = '只读链接已启用 · 分享页会显示「' + name + '」 · 对方打开即可查看（含成本价），不能修改。';
     else if (code) text = '只读链接已启用 · 对方打开即可查看（含成本价），不能修改。';
     document.getElementById('syncShareState').textContent = text;
   }
@@ -2054,24 +2298,25 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     shareApiRequest('GET', syncConfig.code).then(function (res) {
       if (seq !== shareRefreshSeq || !syncConfig) return;
       if (!res || !res.configured) {
-        if (syncConfig.shareCode) {
-          syncConfig.shareCode = null;
-          syncConfig.shareCreatedAt = 0;
-          saveSyncConfig();
-        }
+        syncConfig.shareCode = null;
+        syncConfig.shareCreatedAt = 0;
+        syncConfig.shareName = '';
+        saveSyncConfig();
         renderShareBox('revoked');
         return;
       }
-      // 本机记录的分享码已被其他设备轮换
-      if (syncConfig.shareCode && syncConfig.shareCreatedAt &&
-          Number(res.createdAt) !== Number(syncConfig.shareCreatedAt)) {
-        syncConfig.shareCode = null;
-        syncConfig.shareCreatedAt = 0;
-        saveSyncConfig();
-        renderShareBox('remote');
+      // 服务端返回同一主档的当前分享码；其他设备生成的也能在这里显示
+      var code = SyncCore.normalizeShareCode(res.shareCode);
+      if (!code) {
+        // 旧版分享指针没有保存明文分享码，只能请用户重新生成一次
+        renderShareBox('legacy');
         return;
       }
-      renderShareBox(syncConfig.shareCode ? '' : 'remote');
+      syncConfig.shareCode = code;
+      syncConfig.shareCreatedAt = Number(res.createdAt) || 0;
+      syncConfig.shareName = cleanShareNameInput(res.shareName);
+      saveSyncConfig();
+      renderShareBox('');
     }).catch(function () {
       if (seq !== shareRefreshSeq) return;
       renderShareBox('error');
@@ -2085,11 +2330,13 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     shareBusy = true;
     syncMsg('正在生成分享链接…', 'info');
     var code = SyncCore.generateShareCode();
-    shareApiRequest('POST', syncConfig.code, { shareCode: code }).then(function (res) {
+    var name = readShareNameInput();
+    shareApiRequest('POST', syncConfig.code, { shareCode: code, shareName: name }).then(function (res) {
       shareBusy = false;
       shareRefreshSeq++;
       syncConfig.shareCode = (res && res.shareCode) || code;
       syncConfig.shareCreatedAt = (res && res.createdAt) || Date.now();
+      syncConfig.shareName = cleanShareNameInput(res && res.shareName != null ? res.shareName : name);
       saveSyncConfig();
       renderShareBox('');
       syncMsg('✅ 分享链接已生成，复制发给对方即可', 'ok');
@@ -2097,6 +2344,25 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       shareBusy = false;
       if (err.status === 409 && (attempt || 0) < 2) { generateShare((attempt || 0) + 1); return; }
       syncMsg('❌ 生成分享链接失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function saveShareName() {
+    if (!syncConfig || !syncConfig.shareCode || shareBusy) return;
+    var name = readShareNameInput();
+    shareBusy = true;
+    syncMsg('正在保存分享说明…', 'info');
+    shareApiRequest('POST', syncConfig.code, { shareCode: syncConfig.shareCode, shareName: name }).then(function (res) {
+      shareBusy = false;
+      shareRefreshSeq++;
+      syncConfig.shareCreatedAt = (res && res.createdAt) || Date.now();
+      syncConfig.shareName = cleanShareNameInput(res && res.shareName != null ? res.shareName : name);
+      saveSyncConfig();
+      renderShareBox('');
+      syncMsg(name ? '✅ 分享说明已保存' : '✅ 已清空分享说明', 'ok');
+    }).catch(function (err) {
+      shareBusy = false;
+      syncMsg('❌ 保存分享说明失败：' + (err.message || '网络错误'), 'err');
     });
   }
 
@@ -2111,6 +2377,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       shareRefreshSeq++;
       syncConfig.shareCode = null;
       syncConfig.shareCreatedAt = 0;
+      syncConfig.shareName = '';
       saveSyncConfig();
       renderShareBox('revoked');
       syncMsg('✅ 已撤销分享链接', 'ok');
@@ -2400,12 +2667,23 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     }, typeof delay === 'number' ? delay : 5000);
   }
 
-  function openSync() {
+  function openSync() { openSyncModal(false); }
+  function openAddProfile() { openSyncModal(true); }
+  function openSyncModal(isAdd) {
+    addProfileMode = !!isAdd;
     document.getElementById('syncEndpointInput').value = localStorage.getItem(SYNC_ENDPOINT_KEY) || '';
-    syncMsg('');
+    document.getElementById('syncAddNameRow').style.display = isAdd ? 'flex' : 'none';
+    document.getElementById('syncNewNameInput').value = '';
+    document.getElementById('syncCodeInput').value = '';
+    syncMsg(isAdd ? '添加主码会建立独立的本地档案，不会复制当前持仓。' : '', isAdd ? 'info' : '');
     updateSyncUI();
+    if (isAdd) {
+      document.getElementById('syncUnbound').style.display = 'block';
+      document.getElementById('syncBound').style.display = 'none';
+      document.getElementById('syncShareBox').style.display = 'none';
+    }
     renderShareBox('');
-    if (syncConfig) refreshShareState();
+    if (!isAdd && syncConfig) refreshShareState();
     document.getElementById('syncOverlay').classList.add('show');
   }
 
@@ -2418,6 +2696,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     }
     setSyncBusy(true);
     syncMsg('正在生成同步码…', 'info');
+    var addName = addProfileMode ? cleanProfileName(document.getElementById('syncNewNameInput').value) : '';
     var attempts = 0;
     function tryOnce() {
       var code = SyncCore.generateCode();
@@ -2431,6 +2710,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
           return;
         }
         setSyncBusy(false);
+        if (addProfileMode) { prepareAddProfile(code, addName); return; }
         document.getElementById('syncCodeInput').value = code;
         handleRemote(code, doc);
       }).catch(function (err) {
@@ -2467,6 +2747,17 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     applyReadOnlyUI();
     updateSyncUI();
     document.getElementById('syncBtn').addEventListener('click', openSync);
+    var profileSel = document.getElementById('profileSelect');
+    if (profileSel) {
+      profileSel.addEventListener('change', function () {
+        if (this.value === '__add__') {
+          this.value = activeProfile ? activeProfile.code : '';
+          openAddProfile();
+          return;
+        }
+        switchProfile(this.value);
+      });
+    }
     document.getElementById('syncGenerateBtn').addEventListener('click', generateAndConnect);
     document.getElementById('syncConnectBtn').addEventListener('click', function () {
       var raw = document.getElementById('syncCodeInput').value;
@@ -2477,10 +2768,18 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       var code = SyncCore.normalizeCode(raw);
       if (!code) { syncMsg('主同步码格式不正确，应为 SG-XXXX-XXXX-XXXX-XXXX', 'err'); return; }
       saveEndpointFromInput();
+      if (addProfileMode) {
+        prepareAddProfile(code, document.getElementById('syncNewNameInput').value);
+        return;
+      }
       beginConnect(code);
     });
     document.getElementById('syncCodeInput').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') document.getElementById('syncConnectBtn').click();
+    });
+    document.getElementById('syncNameSaveBtn').addEventListener('click', saveProfileName);
+    document.getElementById('syncNameInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') saveProfileName();
     });
     // 自定义服务地址：输入时即时保存，避免填完后没点“连接”就点“生成”时报不可用
     document.getElementById('syncEndpointInput').addEventListener('input', saveEndpointFromInput);
@@ -2502,6 +2801,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       silentSync();
     });
     document.getElementById('syncShareGenBtn').addEventListener('click', function () { generateShare(0); });
+    document.getElementById('syncShareNameSaveBtn').addEventListener('click', saveShareName);
     document.getElementById('syncShareCopyBtn').addEventListener('click', copyShareCode);
     document.getElementById('syncShareCopyLinkBtn').addEventListener('click', copyShareLink);
     document.getElementById('syncShareOpenBtn').addEventListener('click', openSharePreview);
@@ -2531,6 +2831,19 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
 
     if (syncConfig && hasSyncedMarker(syncConfig.code)) {
       setTimeout(silentSync, 1200);
+    }
+
+    // 添加主码后自动进入首次连接流程（本地档案为空，会直接拉取云端数据）
+    var pendingConnect = '';
+    try { pendingConnect = localStorage.getItem(PENDING_CONNECT_KEY) || ''; } catch (e) {}
+    if (pendingConnect) {
+      try { localStorage.removeItem(PENDING_CONNECT_KEY); } catch (e) {}
+      var pc = SyncCore.normalizeCode(pendingConnect);
+      if (pc) {
+        openSyncModal(false);
+        document.getElementById('syncCodeInput').value = pc;
+        beginConnect(pc);
+      }
     }
   }
 

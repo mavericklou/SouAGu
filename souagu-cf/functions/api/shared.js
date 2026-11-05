@@ -48,7 +48,7 @@ export async function onRequestGet({ request, env }) {
   try {
     const shared = await loadShared(env, parsed.code);
     if (!shared.ok) return json({ error: shared.error }, shared.status);
-    return json(sharePayload(shared.doc, parsed.code));
+    return json(sharePayload(shared.doc, parsed.code, shared.name));
   } catch (err) {
     return json({ error: '读取分享数据失败' }, 500);
   }

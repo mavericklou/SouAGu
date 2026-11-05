@@ -2,10 +2,11 @@
  * 分享码公共逻辑（sync.js / share.js / shared.js 共用）
  *
  * 主码   holdings:<SHA-256(主同步码)>
- * 分享   share:<SHA-256(分享码)> -> { owner: <主档 hash>, createdAt }
- * 指针   shareOwner:<主档 hash>  -> { share: <分享码 hash>, createdAt }
+ * 分享   share:<SHA-256(分享码)> -> { owner: <主档 hash>, createdAt, name }
+ * 指针   shareOwner:<主档 hash>  -> { share: <分享码 hash>, code: "SC-...", createdAt, name }
  *
- * 分享端必须校验 shareOwner 指针，保证同一主档同时只有一个有效分享码。
+ * 指针里保存分享码明文，只用于多设备查看同一个只读链接；
+ * 主同步码仍然只存哈希。分享端必须校验指针，保证同一主档同时只有一个有效分享码。
  */
 
 const CODE_LENGTH = 16;
@@ -57,6 +58,11 @@ export function ownerKey(hash) { return OWNER_KEY_PREFIX + hash; }
 export function shareKey(hash) { return SHARE_KEY_PREFIX + hash; }
 export function ownerShareKey(hash) { return OWNER_SHARE_KEY_PREFIX + hash; }
 
+// 分享说明：去首尾空白、压缩连续空白、最多 60 个字符
+export function cleanShareName(value) {
+  return String(value == null ? '' : value).replace(/\s+/g, ' ').trim().slice(0, 60);
+}
+
 export async function loadShared(env, shareCode) {
   const shareHash = await sha256Hex(shareCode);
   const map = await env.HOLDINGS.get(shareKey(shareHash), 'json');
@@ -73,11 +79,11 @@ export async function loadShared(env, shareCode) {
   const doc = await env.HOLDINGS.get(ownerKey(map.owner), 'json');
   if (!doc) return { ok: false, status: 404, error: '分享的持仓已失效' };
 
-  return { ok: true, doc };
+  return { ok: true, doc, name: cleanShareName(ptr.name) };
 }
 
 // 分享端不返回墓碑：只读方不需要删除历史，也避免已删除持仓的细节继续外泄
-export function sharePayload(doc, shareCode) {
+export function sharePayload(doc, shareCode, shareName) {
   return {
     rev: Number(doc.rev) || 0,
     updatedAt: Number(doc.updatedAt) || 0,
@@ -86,6 +92,7 @@ export function sharePayload(doc, shareCode) {
     settingsUpdatedAt: Number(doc.settingsUpdatedAt) || 0,
     empty: false,
     readOnly: true,
-    shareCode
+    shareCode,
+    shareName: cleanShareName(shareName)
   };
 }

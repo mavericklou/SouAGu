@@ -75,8 +75,10 @@ function readShareState(env, code) {
   return getShareState({ request: request(`${SHARE_BASE}?code=${encodeURIComponent(code)}`), env });
 }
 
-function create(env, ownerCode, shareCode) {
-  return createShare({ request: request(`${SHARE_BASE}?code=${encodeURIComponent(ownerCode)}`, 'POST', { shareCode }), env });
+function create(env, ownerCode, shareCode, shareName) {
+  const body = { shareCode };
+  if (shareName !== undefined) body.shareName = shareName;
+  return createShare({ request: request(`${SHARE_BASE}?code=${encodeURIComponent(ownerCode)}`, 'POST', body), env });
 }
 
 function revoke(env, ownerCode) {
@@ -104,8 +106,9 @@ test('生成分享码后：只读接口返回数据、过滤墓碑、分享码�
     record({ id: '22222222-2222-4222-8222-222222222222', code: '000001', deletedAt: '2026-01-02T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' })
   ]);
 
-  const created = await (await create(env, OWNER, SHARE_A)).json();
+  const created = await (await create(env, OWNER, SHARE_A, '张三的主观交易')).json();
   assert.equal(created.shareCode, SHARE_A);
+  assert.equal(created.shareName, '张三的主观交易');
 
   // /api/sync 不再读取分享码
   const wrongApi = await readSync(env, SHARE_A);
@@ -116,6 +119,7 @@ test('生成分享码后：只读接口返回数据、过滤墓碑、分享码�
   const body = await res.json();
   assert.equal(body.readOnly, true);
   assert.equal(body.shareCode, SHARE_A);
+  assert.equal(body.shareName, '张三的主观交易');
   assert.equal(body.holdings.length, 1);
   assert.equal(body.holdings[0].code, '600000');
   assert.deepEqual(body.settings, { stockRate: 1 });
@@ -151,6 +155,41 @@ test('轮换后旧分享码立即失效，只有一个有效码', async () => {
 
   assert.equal((await readShared(env, SHARE_A)).status, 404);
   assert.equal((await readShared(env, SHARE_B)).status, 200);
+});
+
+test('GET /api/share 返回当前分享码明文与说明，其他设备可显示同一链接', async () => {
+  const env = makeEnv();
+  await seed(env);
+  const created = await (await create(env, OWNER, SHARE_A, '  主观   交易  ')).json();
+  assert.equal(created.shareName, '主观 交易');
+
+  const state = await (await readShareState(env, OWNER)).json();
+  assert.equal(state.configured, true);
+  assert.equal(state.shareCode, SHARE_A);
+  assert.equal(state.shareName, '主观 交易');
+  assert.ok(state.createdAt > 0);
+
+  // 同一分享码只改说明：链接不变，说明同步更新
+  const renamed = await (await create(env, OWNER, SHARE_A, '某某某的趋势策略')).json();
+  assert.equal(renamed.shareCode, SHARE_A);
+  assert.equal(renamed.shareName, '某某某的趋势策略');
+
+  const renamedState = await (await readShareState(env, OWNER)).json();
+  assert.equal(renamedState.shareCode, SHARE_A);
+  assert.equal(renamedState.shareName, '某某某的趋势策略');
+
+  const shared = await (await readShared(env, SHARE_A)).json();
+  assert.equal(shared.shareName, '某某某的趋势策略');
+});
+
+test('分享说明压缩空白并截断到 60 个字符', async () => {
+  const env = makeEnv();
+  await seed(env);
+  const longName = '  甲  '.repeat(1) + '乙'.repeat(80);
+  const created = await (await create(env, OWNER, SHARE_A, longName)).json();
+  assert.equal(created.shareName.length, 60);
+  assert.ok(!/^\\s|\\s$/.test(created.shareName));
+  assert.ok(!created.shareName.includes('  '));
 });
 
 test('撤销分享码后失效，状态为未配置', async () => {

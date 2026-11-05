@@ -83,7 +83,7 @@ PUT  /api/sync?code=SG-XXXX-XXXX-XXXX-XXXX
 
 ```
 GET  /api/shared?code=SC-XXXX-XXXX-XXXX-XXXX
-  → 200 { rev, updatedAt, holdings, settings, settingsUpdatedAt, empty:false, readOnly:true, shareCode }
+  → 200 { rev, updatedAt, holdings, settings, settingsUpdatedAt, empty:false, readOnly:true, shareCode, shareName }
   → 400 不是明确的分享码（主码或裸 16 位码）
   → 404 分享码无效 / 已撤销 / 已轮换
 
@@ -98,11 +98,12 @@ PUT  /api/sync?code=SC-XXXX-XXXX-XXXX-XXXX
 
 ```
 GET    /api/share?code=SG-...
-  → 200 { configured: true|false, createdAt }
+  → 200 { configured: true|false, shareCode, shareName, createdAt }
+    // shareCode 为当前分享码明文；其他设备据此显示同一个只读链接
 
 POST   /api/share?code=SG-...
-  body { shareCode: "SC-XXXX-XXXX-XXXX-XXXX" }
-  → 200 { shareCode, createdAt }     // 生成或轮换，旧码立即失效
+  body { shareCode: "SC-XXXX-XXXX-XXXX-XXXX", shareName?: "分享说明" }
+  → 200 { shareCode, shareName, createdAt }  // 生成 / 轮换（旧码立即失效）/ 只改说明
   → 409 分享码已被占用
 
 DELETE /api/share?code=SG-...
@@ -111,8 +112,10 @@ DELETE /api/share?code=SG-...
 
 - 主码格式 `SG-XXXX-XXXX-XXXX-XXXX`，分享码格式 `SC-XXXX-XXXX-XXXX-XXXX`，均为 16 位 Base32（约 80 bit）
 - 同步码/分享码不区分大小写、可省略横线；`/api/shared` 只接受明确的 `SC-` 前缀，裸 16 位码按主同步码处理
-- KV key = `holdings:` + SHA-256(规范化主码)，**不存明文**
-- 分享映射：`share:` + SHA-256(分享码) → `{ owner, createdAt }`；反向指针 `shareOwner:` + SHA-256(主码) → `{ share, createdAt }`
+- KV key = `holdings:` + SHA-256(规范化主码)，**主同步码不存明文**
+- 分享映射：`share:` + SHA-256(分享码) → `{ owner, createdAt, name }`；反向指针 `shareOwner:` + SHA-256(主码) → `{ share, code, createdAt, name }`
+- 反向指针里保存分享码明文（`code`）和分享说明（`name`），只用于让同一主码的其他设备显示同一个只读链接；**主同步码仍只存哈希**
+- 分享说明会去首尾空白、压缩连续空白，最多 60 个字符；可为空
 - 分享端 GET 必须校验反向指针，**同一个主档同时只有一个有效分享码**；轮换或撤销后旧码立即失效
 - 分享数据包含完整持仓与成本价、费率设置；历史墓碑会被过滤，不向只读端返回
 - 只读端只在内存中预览，**不写入**任何 `localStorage` 数据，也不会发起 PUT
@@ -156,10 +159,18 @@ https://<页面域名与路径>#share=SC-XXXX-XXXX-XXXX-XXXX
 - 对方打开链接后进入同一个 `portfolio.html` 的**只读预览模式**：在内存中显示分享者的持仓、成本价和费率，**不写入对方的 `portfolio_holdings`、费率、同步配置、`synced:` 标记或自动备份**
 - 只读预览保留搜索、排序、合并、导出；隐藏删除，禁用添加/导入/设置/数量/成本输入；同步按钮隐藏，不会触发查看者自己的云同步
 - 预览页顶部横幅可「刷新」拉取最新快照，「退出预览」会清除 hash 并回到对方自己的数据
-- 分享码明文只保存在生成它的设备 `syncConfig.shareCode`；服务端只存哈希，其他主码设备只能看到「已在其他设备生成」
+- 生成分享时可填写一段「分享说明」（最多 60 字），只读页顶部横幅和浏览器标题会显示它，而不只是「持仓助手」
+- 任意持有主码的设备打开同步弹窗时，会向 `/api/share` 查询当前分享码，因此其他设备生成的分享码/链接也能直接显示和复制
 - **同一主档同时只能有一个有效分享码**：重新生成会自动轮换，旧链接立即失效；撤销后已打开的页面刷新会提示失效
 - 成本价属于分享内容，**完全公开**，不做隐藏
 - 主同步输入框只接受 `SG-...` 主码；输入 `SC-...` 会提示改用分享链接，不再支持用分享码连接
+
+### 多主码与昵称
+
+- 页面顶部有主码下拉框，可在多个 `SG-...` 主码之间切换；每个主码可设一个最多 12 个字的昵称（未设置时显示主码末 4 位）
+- 每个主码拥有独立的本地档案（持仓、费率、同步状态），切换时整页重载，**不会把 A 主码的持仓合并进 B 主码**
+- 「＋ 添加主码…」会新建空档案并自动进入首次连接流程；老用户第一个主码继续沿用旧存储 key，不会丢数据
+- 只读分享预览中不显示主码下拉框，也不会写入任何档案信息
 
 > KV 最终一致性（全球最长约 60 秒）：分享码生成/撤销/轮换可能有短暂延迟。分享端每次刷新约 3 次 KV 读。
 
@@ -183,4 +194,4 @@ node --test test/*.test.mjs
 
 - `sync-core.test.mjs`：从 `portfolio.html` 提取同步核心逻辑，测试合并/墓碑/去重/哈希/分享码格式
 - `worker.test.mjs`：用内存 KV mock 测试主档 GET / PUT / 409 / 校验
-- `share.test.mjs`：`/api/shared` 只读快照、`/api/sync` 对 SC 返回 400、SC PUT 403、轮换/撤销/单码约束、墓碑过滤
+- `share.test.mjs`：`/api/shared` 只读快照与分享说明、`/api/sync` 对 SC 返回 400、SC PUT 403、`/api/share` 返回当前分享码明文、轮换/撤销/单码约束、墓碑过滤
