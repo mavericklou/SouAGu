@@ -46,6 +46,22 @@ test('生成的同步码格式正确且随机', () => {
   assert.notEqual(a, b);
 });
 
+test('分享码规范化：必须带 SC 前缀', () => {
+  assert.equal(Core.normalizeShareCode('sc-2abc-3def-4ghj-5klm'), 'SC-2ABC-3DEF-4GHJ-5KLM');
+  assert.equal(Core.normalizeShareCode('SC2ABC3DEF4GHJ5KLM'), 'SC-2ABC-3DEF-4GHJ-5KLM');
+  assert.equal(Core.normalizeShareCode('  sc 2abc 3def 4ghj 5klm '), 'SC-2ABC-3DEF-4GHJ-5KLM');
+  assert.equal(Core.normalizeShareCode('SG-2ABC-3DEF-4GHJ-5KLM'), '');
+  assert.equal(Core.normalizeShareCode('2ABC3DEF4GHJ5KLM'), '');
+  assert.equal(Core.normalizeShareCode('SC-2ABC'), '');
+});
+
+test('生成的分享码格式正确且与主码前缀不同', () => {
+  const code = Core.generateShareCode();
+  assert.match(code, /^SC-[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$/);
+  assert.equal(Core.normalizeShareCode(code), code);
+  assert.equal(Core.normalizeCode(code), '');
+});
+
 test('UUID 生成与识别', () => {
   const id = Core.uuid();
   assert.equal(Core.isUuid(id), true);

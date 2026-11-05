@@ -233,6 +233,32 @@ tr.deleting .del { opacity: 0.7; }
 }
 #syncToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* -------- 只读分享 -------- */
+#readOnlyBanner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: rgba(26,115,232,0.08); border: 1px solid rgba(26,115,232,0.18);
+  color: #1557b0; font-size: 12px; padding: 8px 12px; border-radius: 8px;
+  margin-bottom: 8px;
+}
+#readOnlyBanner button {
+  padding: 4px 12px; border: 1px solid rgba(26,115,232,0.35); border-radius: 6px;
+  background: #fff; color: #1a73e8; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+body.readonly .del { display: none; }
+body.readonly #mergeSwitch { opacity: .55; pointer-events: none; }
+body.readonly #addBtn,
+body.readonly #importBtn,
+body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
+.sync-share-box {
+  margin-top: 18px; padding-top: 14px; border-top: 1px dashed #e5e5e5;
+}
+.sync-share-head { font-size: 13px; color: #333; font-weight: 600; margin-bottom: 6px; }
+.sync-share-desc { font-size: 12px; color: #999; line-height: 1.6; margin: 0 0 10px; }
+.sync-share-state { font-size: 12px; color: #999; margin: 10px 0 0; min-height: 16px; line-height: 1.55; }
+.sync-share-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.sync-share-actions .sync-secondary-btn { width: 100%; }
+.sync-share-actions .sync-link-btn { margin-top: 0; white-space: nowrap; }
+
 /* -------- 遮罩层 / 弹窗 -------- */
 #installOverlay {
   display: none; position: fixed; inset: 0; z-index: 99999;
@@ -353,11 +379,11 @@ tr.deleting .del { opacity: 0.7; }
 
     <!-- 未绑定 -->
     <div id="syncUnbound">
-      <p class="sync-desc">用同一个同步码在多台设备间同步持仓。<b>同步码等同于密码</b>，请妥善保管，丢失后无法找回；任何拿到它的人都能读写你的数据。</p>
+      <p class="sync-desc">用同一个同步码在多台设备间同步持仓。<b>同步码等同于密码</b>，请妥善保管，丢失后无法找回；任何拿到它的人都能读写你的数据。<br>如果对方只输入分享码（SC- 开头），则只能查看，不能修改。</p>
       <button id="syncGenerateBtn" class="sync-primary-btn">生成新同步码</button>
-      <div class="sync-divider"><span>或使用已有同步码</span></div>
+      <div class="sync-divider"><span>或使用已有同步码 / 分享码</span></div>
       <div class="sync-input-row">
-        <input id="syncCodeInput" type="text" placeholder="SG-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <input id="syncCodeInput" type="text" placeholder="SG-XXXX-… 或 SC-XXXX-…" autocomplete="off" autocapitalize="characters" spellcheck="false">
         <button id="syncConnectBtn" class="sync-secondary-btn">连接</button>
       </div>
       <details class="sync-advanced">
@@ -377,6 +403,21 @@ tr.deleting .del { opacity: 0.7; }
       <div class="sync-bound-actions">
         <button id="syncNowBtn" class="sync-primary-btn">立即同步</button>
         <button id="syncDisconnectBtn" class="sync-secondary-btn">断开</button>
+      </div>
+
+      <!-- 分享码（仅主同步码持有者可见） -->
+      <div id="syncShareBox" class="sync-share-box" style="display:none">
+        <div class="sync-share-head">👁 只读分享</div>
+        <p class="sync-share-desc">分享码只能查看，不能上传修改。任何拿到它的人都能看到完整持仓（含成本价）。</p>
+        <div id="syncShareCodeRow" class="sync-code-row" style="display:none">
+          <span id="syncShareCodeDisplay"></span>
+          <button id="syncShareCopyBtn" class="sync-mini-btn">复制</button>
+        </div>
+        <div id="syncShareState" class="sync-share-state"></div>
+        <div class="sync-share-actions">
+          <button id="syncShareGenBtn" class="sync-secondary-btn">生成分享码</button>
+          <button id="syncShareRevokeBtn" class="sync-link-btn" style="display:none">撤销分享</button>
+        </div>
       </div>
     </div>
 
@@ -408,6 +449,11 @@ tr.deleting .del { opacity: 0.7; }
     <button id="settingsPageBtn" title="费率设置">设置</button>
     <button id="installBtn" title="添加到桌面" aria-label="添加到桌面">📲</button>
   </div>
+</div>
+
+<div id="readOnlyBanner" style="display:none">
+  <span>👁 只读分享模式 · 数据由分享者更新</span>
+  <button id="readOnlyRefreshBtn">刷新</button>
 </div>
 
 <div class="form-row">
@@ -520,13 +566,30 @@ tr.deleting .del { opacity: 0.7; }
     return 'SG-' + s.match(/.{4}/g).join('-');
   }
 
-  function generateCode() {
+  function random16() {
     var bytes = new Uint8Array(16);
     if (root.crypto && root.crypto.getRandomValues) root.crypto.getRandomValues(bytes);
     else for (var i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
     var out = '';
     for (var j = 0; j < 16; j++) out += ALPHABET[bytes[j] % 32];
-    return 'SG-' + out.match(/.{4}/g).join('-');
+    return out;
+  }
+
+  function generateCode() {
+    return 'SG-' + random16().match(/.{4}/g).join('-');
+  }
+
+  // 分享码必须带 SC 前缀；16 位裸码仍按主同步码处理，避免旧码歧义
+  function normalizeShareCode(input) {
+    var s = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (s.length !== 18 || s.indexOf('SC') !== 0) return '';
+    s = s.slice(2);
+    if (!/^[A-HJ-NP-Z2-9]{16}$/.test(s)) return '';
+    return 'SC-' + s.match(/.{4}/g).join('-');
+  }
+
+  function generateShareCode() {
+    return 'SC-' + random16().match(/.{4}/g).join('-');
   }
 
   function timeVal(v) {
@@ -638,6 +701,8 @@ tr.deleting .del { opacity: 0.7; }
     isUuid: isUuid,
     normalizeCode: normalizeCode,
     generateCode: generateCode,
+    normalizeShareCode: normalizeShareCode,
+    generateShareCode: generateShareCode,
     cleanRecord: cleanRecord,
     migrateIds: migrateIds,
     active: active,
@@ -839,6 +904,7 @@ tr.deleting .del { opacity: 0.7; }
     applySettings(s, Date.now());
   }
   function openSettings() {
+    if (readOnlyMode) return;
     var s = loadSettings();
     document.getElementById('stockRate').value = s.stockRate;
     document.getElementById('etfRate').value = s.etfRate;
@@ -1068,6 +1134,7 @@ tr.deleting .del { opacity: 0.7; }
   function fmt0(n) { return n === undefined || n === null ? '--' : n.toLocaleString('zh-CN', {minimumFractionDigits:0, maximumFractionDigits:0}); }
 
   function addStock() {
+    if (readOnlyMode) return;
     if (!selectedStock) return;
     var s = selectedStock;
     var qty = parseFloat(document.getElementById('qty').value);
@@ -1101,6 +1168,7 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function removeStock(id) {
+    if (readOnlyMode) return;
     // 软删除：标记为待删除，5分钟后真正删除
     if (pendingDeletions[id] !== undefined) {
       // 已标记为待删除 → 撤销
@@ -1146,6 +1214,7 @@ tr.deleting .del { opacity: 0.7; }
     openExport();
   });
   document.getElementById('importBtn').addEventListener('click', function() {
+    if (readOnlyMode) return;
     // 重置为粘贴面板
     switchImportTab('paste');
     document.getElementById('importInput').value = '';
@@ -1372,6 +1441,7 @@ tr.deleting .del { opacity: 0.7; }
   // 设置
   document.getElementById('settingsPageBtn').addEventListener('click', openSettings);
   document.getElementById('settingsSaveBtn').addEventListener('click', function() {
+    if (readOnlyMode) return;
     var stockRate = parseFloat(document.getElementById('stockRate').value);
     var etfRate = parseFloat(document.getElementById('etfRate').value);
     var stockMin = parseFloat(document.getElementById('stockMin').value);
@@ -1391,11 +1461,16 @@ tr.deleting .del { opacity: 0.7; }
   var syncTimer = null;
   var syncToastTimer = null;
   var syncDotState = '';
+  var readOnlyMode = false;
+  var shareBusy = false;
+  var shareRefreshSeq = 0;
 
   function loadSyncConfig() {
     try {
       var c = JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY));
-      return (c && typeof c.code === 'string') ? c : null;
+      if (!c || typeof c.code !== 'string') return null;
+      if (!c.mode) c.mode = /^SC-/.test(c.code) ? 'reader' : 'owner';
+      return c;
     } catch (e) { return null; }
   }
   function saveSyncConfig() {
@@ -1423,6 +1498,11 @@ tr.deleting .del { opacity: 0.7; }
     if (custom) return custom;
     return '/api/sync';
   }
+  function shareEndpoint() {
+    var ep = syncEndpoint();
+    if (/\/sync$/i.test(ep)) return ep.replace(/\/sync$/i, '/share');
+    return ep.replace(/\/+$/, '') + '/share';
+  }
   function saveEndpointFromInput() {
     var el = document.getElementById('syncEndpointInput');
     if (!el) return;
@@ -1446,8 +1526,7 @@ tr.deleting .del { opacity: 0.7; }
     return '当前页面无法访问同步服务，请在“高级”里填写完整的服务地址。';
   }
 
-  function apiRequest(method, code, body) {
-    var url = syncEndpoint() + '?code=' + encodeURIComponent(code);
+  function apiFetch(url, method, body) {
     var opts = { method: method, cache: 'no-store', headers: {} };
     if (body !== undefined) {
       opts.headers['Content-Type'] = 'application/json';
@@ -1465,17 +1544,33 @@ tr.deleting .del { opacity: 0.7; }
         if (res.status === 409) {
           var err = new Error('云端版本冲突');
           err.conflict = true;
+          err.status = 409;
           err.remote = data;
           throw err;
         }
-        if (!res.ok) throw new Error((data && data.error) || ('服务返回 HTTP ' + res.status));
+        if (!res.ok) {
+          var e2 = new Error((data && data.error) || ('服务返回 HTTP ' + res.status));
+          e2.status = res.status;
+          throw e2;
+        }
         return data;
       });
     }).catch(function (err) {
       if (timer) clearTimeout(timer);
-      if (err && err.name === 'AbortError') throw new Error('请求超时，请检查网络或服务地址');
+      if (err && err.name === 'AbortError') {
+        var e3 = new Error('请求超时，请检查网络或服务地址');
+        e3.status = 0;
+        throw e3;
+      }
       throw err;
     });
+  }
+
+  function apiRequest(method, code, body) {
+    return apiFetch(syncEndpoint() + '?code=' + encodeURIComponent(code), method, body);
+  }
+  function shareApiRequest(method, ownerCode, body) {
+    return apiFetch(shareEndpoint() + '?code=' + encodeURIComponent(ownerCode), method, body);
   }
 
   function normalizeRemote(remote) {
@@ -1487,7 +1582,9 @@ tr.deleting .del { opacity: 0.7; }
       holdings: hs,
       settings: (remote.settings && typeof remote.settings === 'object') ? remote.settings : null,
       settingsUpdatedAt: Number(remote.settingsUpdatedAt) || 0,
-      updatedAt: Number(remote.updatedAt) || 0
+      updatedAt: Number(remote.updatedAt) || 0,
+      readOnly: !!remote.readOnly,
+      shareCode: typeof remote.shareCode === 'string' ? remote.shareCode : null
     };
   }
   function buildDoc() {
@@ -1531,15 +1628,19 @@ tr.deleting .del { opacity: 0.7; }
     var btn = document.getElementById('syncBtn');
     var unbound = document.getElementById('syncUnbound');
     var bound = document.getElementById('syncBound');
+    var reader = !!(syncConfig && syncConfig.mode === 'reader');
     if (syncConfig && syncConfig.code) {
       btn.classList.add('bound');
       unbound.style.display = 'none';
       bound.style.display = 'block';
       document.getElementById('syncCodeDisplay').textContent = syncConfig.code;
+      document.getElementById('syncNowBtn').textContent = reader ? '立即刷新' : '立即同步';
+      document.getElementById('syncShareBox').style.display = reader ? 'none' : 'block';
       var parts = [];
-      if (syncConfig.lastSyncAt) parts.push('上次同步 ' + new Date(syncConfig.lastSyncAt).toLocaleString());
-      else parts.push('尚未同步');
-      parts.push('rev ' + (syncConfig.rev || 0));
+      if (syncConfig.lastSyncAt) parts.push((reader ? '上次刷新 ' : '上次同步 ') + new Date(syncConfig.lastSyncAt).toLocaleString());
+      else parts.push(reader ? '尚未刷新' : '尚未同步');
+      if (!reader) parts.push('rev ' + (syncConfig.rev || 0));
+      else parts.push('只读分享');
       if (message) parts.push(message);
       document.getElementById('syncState').textContent = parts.join(' · ');
       if (!syncBusy) setSyncDot(syncDotState || 'ok');
@@ -1547,9 +1648,12 @@ tr.deleting .del { opacity: 0.7; }
       btn.classList.remove('bound');
       unbound.style.display = 'block';
       bound.style.display = 'none';
+      document.getElementById('syncShareBox').style.display = 'none';
       if (!syncBusy) setSyncDot(syncDotState || '');
     }
     updateRestoreRow();
+    var restoreRow = document.getElementById('syncRestoreRow');
+    if (reader && restoreRow) restoreRow.style.display = 'none';
   }
 
   function backupKeys() {
@@ -1600,7 +1704,7 @@ tr.deleting .del { opacity: 0.7; }
 
   function setSyncBusy(b) {
     syncBusy = b;
-    ['syncGenerateBtn', 'syncConnectBtn', 'syncNowBtn'].forEach(function (id) {
+    ['syncGenerateBtn', 'syncConnectBtn', 'syncNowBtn', 'syncShareGenBtn', 'syncShareRevokeBtn', 'readOnlyRefreshBtn'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.disabled = b;
     });
@@ -1627,6 +1731,10 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function handleRemote(code, remoteDoc) {
+    if (remoteDoc.readOnly) {
+      handleSharedRemote(code, remoteDoc);
+      return;
+    }
     var localDoc = buildDoc();
     var lc = activeCount(localDoc);
     var rc = activeCount(remoteDoc);
@@ -1668,18 +1776,229 @@ tr.deleting .del { opacity: 0.7; }
 
   function bindSync(code, rev, message) {
     var doc = buildDoc();
+    var prev = syncConfig;
     syncConfig = {
       code: code,
+      mode: 'owner',
       rev: Number(rev) || 0,
       lastSyncAt: Date.now(),
-      lastPushedHash: SyncCore.docHash(doc)
+      lastPushedHash: SyncCore.docHash(doc),
+      shareCode: (prev && prev.code === code) ? (prev.shareCode || null) : null,
+      shareCreatedAt: (prev && prev.code === code) ? (prev.shareCreatedAt || 0) : 0
     };
     saveSyncConfig();
     markSynced(code);
     setSyncDot('ok');
+    applyReadOnlyUI();
     updateSyncUI();
+    renderShareBox('');
     syncMsg('✅ ' + message, 'ok');
     toast(message);
+  }
+
+  function cancelPendingDeletions() {
+    Object.keys(pendingDeletions).forEach(function (k) {
+      clearTimeout(pendingDeletions[k]);
+      delete pendingDeletions[k];
+    });
+  }
+
+  function applyReadOnlyUI() {
+    readOnlyMode = !!(syncConfig && syncConfig.mode === 'reader');
+    document.body.classList.toggle('readonly', readOnlyMode);
+    var banner = document.getElementById('readOnlyBanner');
+    if (banner) banner.style.display = readOnlyMode ? 'flex' : 'none';
+    ['importBtn', 'settingsPageBtn', 'qty', 'cost'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.disabled = readOnlyMode;
+    });
+    var search = document.querySelector('#stockSearchContainer .ss-input');
+    if (search) search.disabled = readOnlyMode;
+    var add = document.getElementById('addBtn');
+    if (add) add.disabled = readOnlyMode || !selectedStock;
+    if (readOnlyMode) {
+      closeSettings();
+      document.getElementById('importOverlay').classList.remove('show');
+      document.getElementById('importConfirmOverlay').classList.remove('show');
+    }
+  }
+
+  function handleSharedRemote(code, remoteDoc) {
+    var canonical = remoteDoc.shareCode || code;
+    var lc = activeCount(buildDoc());
+    var rc = activeCount(remoteDoc);
+    if (lc > 0) {
+      showChoice('这是只读分享码',
+        '连接后会用分享的 <b>' + rc + '</b> 条持仓替换本机现有 <b>' + lc + '</b> 条数据（覆盖前自动备份）。<br>分享码只能查看，不能上传修改。',
+        [
+          { label: '连接并替换', primary: true, onClick: function () { closeSyncChoice(); connectShareReader(canonical, remoteDoc); } },
+          { label: '取消', onClick: closeSyncChoice }
+        ]);
+      return;
+    }
+    connectShareReader(canonical, remoteDoc);
+  }
+
+  function connectShareReader(code, doc) {
+    if (activeCount(buildDoc()) > 0) backupLocal('连接分享码前自动备份');
+    cancelPendingDeletions();
+    persistDoc(doc);
+    syncConfig = {
+      code: code,
+      mode: 'reader',
+      rev: Number(doc.rev) || 0,
+      lastSyncAt: Date.now(),
+      lastPulledHash: SyncCore.docHash(buildDoc())
+    };
+    saveSyncConfig();
+    markSynced(code);
+    setSyncBusy(false);
+    setSyncDot('ok');
+    document.getElementById('syncCodeInput').value = code;
+    applyReadOnlyUI();
+    render();
+    updateSyncUI();
+    syncMsg('✅ 已连接只读分享，共 ' + activeCount(doc) + ' 条', 'ok');
+    toast('已连接只读分享');
+    refreshPrices().then(function () { render(); });
+  }
+
+  function pullShared(manual) {
+    if (!syncConfig || syncConfig.mode !== 'reader' || syncBusy) return;
+    if (!apiAvailable()) { setSyncDot(''); return; }
+    setSyncBusy(true);
+    if (manual) syncMsg('正在刷新分享数据…', 'info');
+    apiRequest('GET', syncConfig.code).then(function (remote) {
+      var doc = normalizeRemote(remote);
+      if (!doc.readOnly) {
+        var e = new Error('分享码已失效');
+        e.status = 404;
+        throw e;
+      }
+      var changed = SyncCore.docHash(buildDoc()) !== SyncCore.docHash(doc);
+      if (changed) { persistDoc(doc); render(); }
+      syncConfig.rev = doc.rev || 0;
+      syncConfig.lastSyncAt = Date.now();
+      syncConfig.lastPulledHash = SyncCore.docHash(buildDoc());
+      saveSyncConfig();
+      setSyncBusy(false);
+      setSyncDot('ok');
+      updateSyncUI(changed ? '已更新' : '已是最新');
+      if (manual) { syncMsg('✅ 已刷新到最新（只读）', 'ok'); toast('已刷新'); }
+      else if (changed) toast('分享数据已更新');
+    }).catch(function (err) {
+      setSyncBusy(false);
+      setSyncDot('err');
+      var expired = err.status === 404 || /失效|撤销/.test(err.message || '');
+      updateSyncUI(expired ? '分享已失效' : '刷新失败');
+      syncMsg(expired ? '❌ 分享码已失效或被撤销，本机保留最后一份数据' : '❌ 刷新失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function renderShareBox(status) {
+    var box = document.getElementById('syncShareBox');
+    if (!box) return;
+    var reader = !!(syncConfig && syncConfig.mode === 'reader');
+    var bound = !!(syncConfig && syncConfig.code);
+    box.style.display = (bound && !reader) ? 'block' : 'none';
+    if (!bound || reader) return;
+    var code = syncConfig.shareCode || '';
+    document.getElementById('syncShareCodeRow').style.display = code ? 'flex' : 'none';
+    document.getElementById('syncShareCodeDisplay').textContent = code;
+    document.getElementById('syncShareGenBtn').textContent = code ? '重新生成（旧码失效）' : '生成分享码';
+    document.getElementById('syncShareRevokeBtn').style.display = code ? 'inline' : 'none';
+    var text = '未生成分享码';
+    if (status === 'remote') text = '分享码已在其他设备生成；本机无法显示明文，重新生成会使旧码失效。';
+    else if (status === 'error') text = '分享服务不可用，请确认 Pages Function 已重新部署。';
+    else if (status === 'revoked') text = '未生成分享码';
+    else if (code) text = '已启用 · 只读';
+    document.getElementById('syncShareState').textContent = text;
+  }
+
+  function refreshShareState() {
+    if (!syncConfig || syncConfig.mode === 'reader') return;
+    var seq = ++shareRefreshSeq;
+    renderShareBox('');
+    shareApiRequest('GET', syncConfig.code).then(function (res) {
+      if (seq !== shareRefreshSeq || !syncConfig || syncConfig.mode === 'reader') return;
+      if (!res || !res.configured) {
+        if (syncConfig.shareCode) {
+          syncConfig.shareCode = null;
+          syncConfig.shareCreatedAt = 0;
+          saveSyncConfig();
+        }
+        renderShareBox('revoked');
+        return;
+      }
+      // 本机记录的分享码已被其他设备轮换
+      if (syncConfig.shareCode && syncConfig.shareCreatedAt &&
+          Number(res.createdAt) !== Number(syncConfig.shareCreatedAt)) {
+        syncConfig.shareCode = null;
+        syncConfig.shareCreatedAt = 0;
+        saveSyncConfig();
+        renderShareBox('remote');
+        return;
+      }
+      renderShareBox(syncConfig.shareCode ? '' : 'remote');
+    }).catch(function () {
+      if (seq !== shareRefreshSeq) return;
+      renderShareBox('error');
+    });
+  }
+
+  function generateShare(attempt) {
+    if (!syncConfig || syncConfig.mode === 'reader' || shareBusy) return;
+    if (!apiAvailable()) { syncMsg(syncUnavailableMessage(), 'err'); return; }
+    if (syncConfig.shareCode && !confirm('重新生成会让旧分享码立即失效，确定吗？')) return;
+    shareBusy = true;
+    syncMsg('正在生成分享码…', 'info');
+    var code = SyncCore.generateShareCode();
+    shareApiRequest('POST', syncConfig.code, { shareCode: code }).then(function (res) {
+      shareBusy = false;
+      shareRefreshSeq++;
+      syncConfig.shareCode = (res && res.shareCode) || code;
+      syncConfig.shareCreatedAt = (res && res.createdAt) || Date.now();
+      saveSyncConfig();
+      renderShareBox('');
+      syncMsg('✅ 分享码已生成（只读），复制发给对方即可', 'ok');
+    }).catch(function (err) {
+      shareBusy = false;
+      if (err.status === 409 && (attempt || 0) < 2) { generateShare((attempt || 0) + 1); return; }
+      syncMsg('❌ 生成分享码失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function revokeShare() {
+    if (!syncConfig || syncConfig.mode === 'reader' || shareBusy) return;
+    if (!syncConfig.shareCode) return;
+    if (!confirm('撤销后，使用这个分享码的人将无法再获取更新。确定吗？')) return;
+    shareBusy = true;
+    syncMsg('正在撤销分享码…', 'info');
+    shareApiRequest('DELETE', syncConfig.code).then(function () {
+      shareBusy = false;
+      shareRefreshSeq++;
+      syncConfig.shareCode = null;
+      syncConfig.shareCreatedAt = 0;
+      saveSyncConfig();
+      renderShareBox('revoked');
+      syncMsg('✅ 已撤销分享码', 'ok');
+    }).catch(function (err) {
+      shareBusy = false;
+      syncMsg('❌ 撤销失败：' + (err.message || '网络错误'), 'err');
+    });
+  }
+
+  function copyShareCode() {
+    if (!syncConfig || !syncConfig.shareCode) return;
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      toast('复制失败，请手动选择分享码');
+      return;
+    }
+    navigator.clipboard.writeText(syncConfig.shareCode).then(function () {
+      toast('分享码已复制');
+    }).catch(function () {
+      toast('复制失败，请手动选择分享码');
+    });
   }
 
   function pushUntilSuccess(code, doc, rev, attempt) {
@@ -1838,7 +2157,7 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function pushNow(manual) {
-    if (!syncConfig || syncBusy) return;
+    if (!syncConfig || syncBusy || syncConfig.mode === 'reader') return;
     var doc = buildDoc();
     var hash = SyncCore.docHash(doc);
     if (!manual && hash === syncConfig.lastPushedHash) {
@@ -1870,6 +2189,7 @@ tr.deleting .del { opacity: 0.7; }
 
   function silentSync() {
     if (!syncConfig || syncBusy) return;
+    if (syncConfig.mode === 'reader') { pullShared(false); return; }
     if (!apiAvailable()) { setSyncDot(''); return; }
     setSyncBusy(true);
     apiRequest('GET', syncConfig.code).then(function (remote) {
@@ -1919,7 +2239,7 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function scheduleSyncPush(delay) {
-    if (!syncConfig || !syncConfig.code) return;
+    if (!syncConfig || !syncConfig.code || syncConfig.mode === 'reader') return;
     if (syncTimer) clearTimeout(syncTimer);
     syncTimer = setTimeout(function () {
       syncTimer = null;
@@ -1931,6 +2251,8 @@ tr.deleting .del { opacity: 0.7; }
     document.getElementById('syncEndpointInput').value = localStorage.getItem(SYNC_ENDPOINT_KEY) || '';
     syncMsg('');
     updateSyncUI();
+    renderShareBox('');
+    if (syncConfig && syncConfig.mode !== 'reader') refreshShareState();
     document.getElementById('syncOverlay').classList.add('show');
   }
 
@@ -1968,6 +2290,7 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function restoreLatestBackup() {
+    if (syncConfig && syncConfig.mode === 'reader') return;
     var keys = backupKeys();
     if (!keys.length) return;
     var key = keys[keys.length - 1];
@@ -1988,13 +2311,17 @@ tr.deleting .del { opacity: 0.7; }
   }
 
   function initCloudSync() {
+    applyReadOnlyUI();
     updateSyncUI();
     document.getElementById('syncBtn').addEventListener('click', openSync);
     document.getElementById('syncGenerateBtn').addEventListener('click', generateAndConnect);
     document.getElementById('syncConnectBtn').addEventListener('click', function () {
-      var code = SyncCore.normalizeCode(document.getElementById('syncCodeInput').value);
-      if (!code) { syncMsg('同步码格式不正确，应为 SG-XXXX-XXXX-XXXX-XXXX', 'err'); return; }
+      var raw = document.getElementById('syncCodeInput').value;
+      var share = SyncCore.normalizeShareCode(raw);
+      var code = share || SyncCore.normalizeCode(raw);
+      if (!code) { syncMsg('同步码或分享码格式不正确：主码为 SG-...，分享码为 SC-...', 'err'); return; }
       saveEndpointFromInput();
+      if (share) document.getElementById('syncCodeInput').value = share;
       beginConnect(code);
     });
     document.getElementById('syncCodeInput').addEventListener('keydown', function (e) {
@@ -2016,17 +2343,30 @@ tr.deleting .del { opacity: 0.7; }
       });
     });
     document.getElementById('syncNowBtn').addEventListener('click', function () {
+      if (syncConfig && syncConfig.mode === 'reader') {
+        pullShared(true);
+        return;
+      }
       syncMsg('正在同步…', 'info');
       silentSync();
     });
+    document.getElementById('syncShareGenBtn').addEventListener('click', function () { generateShare(0); });
+    document.getElementById('syncShareCopyBtn').addEventListener('click', copyShareCode);
+    document.getElementById('syncShareRevokeBtn').addEventListener('click', revokeShare);
+    document.getElementById('readOnlyRefreshBtn').addEventListener('click', function () { pullShared(true); });
     document.getElementById('syncDisconnectBtn').addEventListener('click', function () {
-      if (!confirm('断开后本机数据会保留，但不再自动同步。确定断开吗？')) return;
+      var reader = syncConfig && syncConfig.mode === 'reader';
+      if (!confirm(reader
+        ? '断开后将不再接收分享更新，本机数据会保留并恢复可编辑。确定断开吗？'
+        : '断开后本机数据会保留，但不再自动同步。确定断开吗？')) return;
       if (syncConfig) clearSyncedMarker(syncConfig.code);
       syncConfig = null;
       saveSyncConfig();
       setSyncDot('');
+      applyReadOnlyUI();
+      render();
       updateSyncUI();
-      syncMsg('已断开云同步（本地数据保留）', 'info');
+      syncMsg(reader ? '已断开分享（本地数据保留，可编辑）' : '已断开云同步（本地数据保留）', 'info');
     });
     document.getElementById('syncRestoreBtn').addEventListener('click', restoreLatestBackup);
 
@@ -2063,6 +2403,8 @@ tr.deleting .del { opacity: 0.7; }
   if (document.getElementById('mergeCb').checked) {
     document.getElementById('switchTrack').classList.add('on');
   }
+  // 先应用只读状态，避免只读端首屏闪现可编辑界面
+  applyReadOnlyUI();
   render();
   initCloudSync();
   refreshPrices().then(function() { render(); });

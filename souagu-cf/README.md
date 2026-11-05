@@ -6,7 +6,8 @@
 
 ```
 souagu-cf/
-├── functions/api/sync.js   # GET / PUT / OPTIONS
+├── functions/api/sync.js   # 主档 GET / PUT，分享码只读 GET
+├── functions/api/share.js  # 分享码 GET / POST / DELETE（管理）
 ├── public/                 # 由 deploy.sh 生成（已 gitignore）
 ├── wrangler.toml
 ├── deploy.sh
@@ -62,9 +63,11 @@ Dashboard → `souagu` → Custom domains → Set up a custom domain。
 
 ## 二、接口
 
+### 主同步码
+
 ```
 GET  /api/sync?code=SG-XXXX-XXXX-XXXX-XXXX
-  → 200 { rev, updatedAt, holdings, settings, settingsUpdatedAt }
+  → 200 { rev, updatedAt, holdings, settings, settingsUpdatedAt, readOnly: false }
 
 PUT  /api/sync?code=SG-XXXX-XXXX-XXXX-XXXX
   body { rev, holdings, settings, settingsUpdatedAt }
@@ -72,13 +75,44 @@ PUT  /api/sync?code=SG-XXXX-XXXX-XXXX-XXXX
   → 409 { rev, holdings, settings, settingsUpdatedAt }   // 附带服务端全文
 ```
 
-- 同步码不区分大小写、可省略横线，服务端统一规范化为 `SG-XXXX-XXXX-XXXX-XXXX`
-- KV key = `holdings:` + SHA-256(规范化同步码)，**不存明文**
+### 分享码（只读）
+
+```
+GET  /api/sync?code=SC-XXXX-XXXX-XXXX-XXXX
+  → 200 { rev, updatedAt, holdings, settings, settingsUpdatedAt, readOnly: true, shareCode }
+  → 404 分享码无效 / 已撤销 / 已轮换
+
+PUT  /api/sync?code=SC-XXXX-XXXX-XXXX-XXXX
+  → 403 分享码只有只读权限，不能上传修改
+```
+
+分享码管理（只能使用主同步码调用）：
+
+```
+GET    /api/share?code=SG-...
+  → 200 { configured: true|false, createdAt }
+
+POST   /api/share?code=SG-...
+  body { shareCode: "SC-XXXX-XXXX-XXXX-XXXX" }
+  → 200 { shareCode, createdAt }     // 生成或轮换，旧码立即失效
+  → 409 分享码已被占用
+
+DELETE /api/share?code=SG-...
+  → 200 { revoked: true|false }
+```
+
+- 主码格式 `SG-XXXX-XXXX-XXXX-XXXX`，分享码格式 `SC-XXXX-XXXX-XXXX-XXXX`，均为 16 位 Base32（约 80 bit）
+- 同步码/分享码不区分大小写、可省略横线；16 位裸码按主同步码处理，漏写 `SC-` 时服务端会回退按分享码再查一次
+- KV key = `holdings:` + SHA-256(规范化主码)，**不存明文**
+- 分享映射：`share:` + SHA-256(分享码) → `{ owner, createdAt }`；反向指针 `shareOwner:` + SHA-256(主码) → `{ share, createdAt }`
+- 分享端 GET 必须校验反向指针，**同一个主档同时只有一个有效分享码**；轮换或撤销后旧码立即失效
+- 分享数据包含完整持仓与成本价、费率设置；历史墓碑会被过滤，不向只读端返回
+- 只读端整表替换本地数据，不做双向合并；只读端不会发起任何 PUT
 - `rev` 乐观锁：PUT 的 `rev` 必须等于云端当前值
 - 单档上限 256 KB，最多 5000 条
 - `expirationTtl` 365 天，每次写入自动续期
 - 响应 `Cache-Control: no-store`
-- 无 Cookie、无账号；同步码即密钥
+- 无 Cookie、无账号；同步码即密钥，分享码即只读凭证
 
 ## 三、首次运行行为
 
@@ -101,7 +135,20 @@ PUT  /api/sync?code=SG-XXXX-XXXX-XXXX-XXXX
 - 冲突（409）时按 `id + updatedAt` 合并，墓碑（`deletedAt`）优先，最多重试 3 次
 - 离线不阻塞：本地照常使用，`online` 事件或下次打开页面时自动重试
 
-## 五、免费额度
+## 五、分享码（只读分享）
+
+主同步码持有者在「同步」弹窗底部生成一个分享码，发给对方后，对方在输入框粘贴 `SC-...` 连接：
+
+- 界面进入**只读模式**：显示只读横幅，隐藏删除按钮，禁用添加/导入/设置；服务端对分享码 PUT 直接返回 403，作为最终保证
+- 只读端每次打开页面或点击「立即刷新」都会拉取主档最新快照，并整表替换本地数据（覆盖前自动备份）
+- 分享码明文只保存在生成它的设备 `syncConfig.shareCode`；服务端只存哈希，其他设备只能看到「已在其他设备生成」
+- **同一主档同时只能有一个有效分享码**：重新生成会自动轮换，旧码立即失效；撤销后所有使用该码的设备会提示失效并保留最后一份本地数据
+- 成本价属于分享内容，**完全公开**，不做隐藏
+- 断开连接后本地数据保留，并恢复可编辑
+
+> KV 最终一致性（全球最长约 60 秒）：分享码生成/撤销/轮换可能有短暂延迟。分享端每次刷新约 3 次 KV 读。
+
+## 六、免费额度
 
 | 资源 | 免费额度 | 说明 |
 |------|----------|------|
@@ -112,12 +159,13 @@ PUT  /api/sync?code=SG-XXXX-XXXX-XXXX-XXXX
 
 > KV 是最终一致性（全球最长约 60 秒可见）。个人低频修改足够；需要强一致需换 D1 / Durable Objects。
 
-## 六、本地测试
+## 七、本地测试
 
 ```bash
 cd souagu-cf
 node --test test/*.test.mjs
 ```
 
-- `sync-core.test.mjs`：从 `portfolio.html` 提取同步核心逻辑，测试合并/墓碑/去重/哈希
-- `worker.test.mjs`：用内存 KV mock 测试 GET / PUT / 409 / 校验
+- `sync-core.test.mjs`：从 `portfolio.html` 提取同步核心逻辑，测试合并/墓碑/去重/哈希/分享码格式
+- `worker.test.mjs`：用内存 KV mock 测试主档 GET / PUT / 409 / 校验
+- `share.test.mjs`：分享码生成、轮换、撤销、只读 PUT 403、墓碑过滤、单码约束
