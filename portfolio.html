@@ -764,7 +764,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   var selectedStock = null;
   var prices = {};
   var sortCol = null, sortDir = null; // null = 默认按时间倒序
-  var pendingDeletions = {}; // { indexOrCode: setTimeoutId }
+  var pendingDeletions = {}; // key -> { timer, at, merge }
   var filterCode = ''; // 表格筛选代码
   var SyncCore = window.SouAGuSyncCore;
 
@@ -916,6 +916,8 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   // 整表替换（导入/云端覆盖）：旧记录写成墓碑，避免其他设备把已删数据同步回来
   function replaceHoldings(newList) {
     if (previewMode) return;
+    // 整表替换后旧的待删除计时不再有意义，避免到期误删刚导入的记录
+    cancelPendingDeletions();
     var nowIso = new Date().toISOString();
     var raw = loadRawList();
     var keep = {};
@@ -933,6 +935,105 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       out.push(old);
     });
     saveRawList(out.concat(newList || []));
+  }
+
+  /* -------- 延迟删除（5 分钟内可撤销） --------
+   * 待删除状态会持久化到当前主码档案，刷新/关闭页面后仍会继续计时；
+   * 到期后写入 deletedAt 墓碑（软删除），再同步到云端，避免其他设备把记录复活。
+   */
+  var PENDING_DELETE_TTL = 5 * 60 * 1000;
+  function pendingDeleteKey() { return STORAGE_KEY + '_pending_deletions'; }
+  function persistPendingDeletions() {
+    if (previewMode) return;
+    var out = {};
+    Object.keys(pendingDeletions).forEach(function (key) {
+      var e = pendingDeletions[key];
+      if (e) out[key] = { at: e.at, merge: !!e.merge };
+    });
+    try {
+      if (Object.keys(out).length) localStorage.setItem(pendingDeleteKey(), JSON.stringify(out));
+      else localStorage.removeItem(pendingDeleteKey());
+    } catch (e) {}
+  }
+  function schedulePendingDeletion(key, at, isMerge) {
+    if (previewMode) return;
+    var prev = pendingDeletions[key];
+    if (prev && prev.timer) clearTimeout(prev.timer);
+    var stamp = Number(at) || Date.now();
+    var delay = Math.max(0, stamp + PENDING_DELETE_TTL - Date.now());
+    var timer = setTimeout(function () { finalizePendingDeletion(key); }, delay);
+    pendingDeletions[key] = { timer: timer, at: stamp, merge: !!isMerge };
+  }
+  // 把指定 key 的待删除记录写成墓碑；批量处理时只 render / push 一次
+  function applyPendingDeletions(keys) {
+    if (previewMode || !keys.length) return;
+    var raw = loadRawList();
+    var nowIso = new Date().toISOString();
+    var changed = false;
+    keys.forEach(function (key) {
+      var entry = pendingDeletions[key];
+      if (!entry) return;
+      if (entry.timer) clearTimeout(entry.timer);
+      delete pendingDeletions[key];
+      for (var i = 0; i < raw.length; i++) {
+        var s = raw[i];
+        if (s.deletedAt) continue;
+        if (entry.merge ? s.code === key : s.id === key) {
+          s.deletedAt = nowIso;
+          s.updatedAt = nowIso;
+          changed = true;
+        }
+      }
+    });
+    persistPendingDeletions();
+    if (changed) {
+      saveRawList(raw);
+      scheduleSyncPush();
+    }
+    render();
+  }
+  function finalizePendingDeletion(key) {
+    if (!pendingDeletions[key]) return;
+    applyPendingDeletions([key]);
+  }
+  function sweepPendingDeletions() {
+    if (previewMode) return;
+    var now = Date.now();
+    var keys = [];
+    Object.keys(pendingDeletions).forEach(function (key) {
+      var e = pendingDeletions[key];
+      if (e && e.at + PENDING_DELETE_TTL <= now) keys.push(key);
+    });
+    if (keys.length) applyPendingDeletions(keys);
+  }
+  function cancelPendingDeletion(key) {
+    var e = pendingDeletions[key];
+    if (!e) return false;
+    if (e.timer) clearTimeout(e.timer);
+    delete pendingDeletions[key];
+    persistPendingDeletions();
+    return true;
+  }
+  function cancelPendingDeletions() {
+    Object.keys(pendingDeletions).forEach(function (k) {
+      if (pendingDeletions[k] && pendingDeletions[k].timer) clearTimeout(pendingDeletions[k].timer);
+      delete pendingDeletions[k];
+    });
+    persistPendingDeletions();
+  }
+  function loadPendingDeletions() {
+    pendingDeletions = {};
+    if (previewMode) return;
+    var data = null;
+    try { data = JSON.parse(localStorage.getItem(pendingDeleteKey())); } catch (e) {}
+    if (!data || typeof data !== 'object') return;
+    Object.keys(data).forEach(function (key) {
+      var e = data[key];
+      if (!e || typeof key !== 'string') return;
+      var at = Number(e.at);
+      if (!isFinite(at) || at <= 0) return;
+      schedulePendingDeletion(key, at, !!e.merge);
+    });
   }
 
   /* -------- 费率设置 -------- */
@@ -1334,6 +1435,8 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
 
     var list = loadList();
     var nowIso = new Date().toISOString();
+    // 同一代码重新添加时取消待删除，避免 5 分钟后把新记录一起删掉
+    if (pendingDeletions[s.c] !== undefined) cancelPendingDeletion(s.c);
     list.push({
       id: newId(), code: s.c, name: s.n, qty: qty, cost: cost,
       createdAt: nowIso, updatedAt: nowIso, deletedAt: null,
@@ -1356,31 +1459,15 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
 
   function removeStock(id) {
     if (readOnlyMode) return;
-    // 软删除：标记为待删除，5分钟后真正删除
+    // 延迟删除：5 分钟内可撤销，到期后写入墓碑并同步
     if (pendingDeletions[id] !== undefined) {
       // 已标记为待删除 → 撤销
-      clearTimeout(pendingDeletions[id]);
-      delete pendingDeletions[id];
+      cancelPendingDeletion(id);
       render();
       return;
     }
-    pendingDeletions[id] = setTimeout(function() {
-      // 真正删除：写入墓碑（deletedAt），以便同步到其他设备
-      var raw = loadRawList();
-      var nowIso = new Date().toISOString();
-      for (var i = 0; i < raw.length; i++) {
-        var s = raw[i];
-        if (s.deletedAt) continue;
-        if (merge ? s.code === id : s.id === id) {
-          s.deletedAt = nowIso;
-          s.updatedAt = nowIso;
-        }
-      }
-      saveRawList(raw);
-      delete pendingDeletions[id];
-      render();
-      scheduleSyncPush();
-    }, 5 * 60 * 1000);
+    schedulePendingDeletion(id, Date.now(), document.getElementById('mergeCb').checked);
+    persistPendingDeletions();
     render();
   }
 
@@ -1618,6 +1705,8 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     var cb = document.getElementById('mergeCb');
     cb.checked = !cb.checked;
     document.getElementById('switchTrack').classList.toggle('on');
+    // 合并/明细模式的删除键不同（代码 vs 记录 id），切换后取消未完成的删除避免误删
+    cancelPendingDeletions();
     render();
   });
 
@@ -1652,6 +1741,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   var syncDotState = '';
   var shareBusy = false;
   var shareRefreshSeq = 0;
+  var shareNameDirty = false;
 
   function loadSyncConfig() {
     try {
@@ -2229,13 +2319,6 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     toast(message);
   }
 
-  function cancelPendingDeletions() {
-    Object.keys(pendingDeletions).forEach(function (k) {
-      clearTimeout(pendingDeletions[k]);
-      delete pendingDeletions[k];
-    });
-  }
-
   function applyReadOnlyUI() {
     readOnlyMode = previewMode;
     document.body.classList.toggle('readonly', readOnlyMode);
@@ -2273,7 +2356,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     var name = syncConfig.shareName || '';
     var link = code ? buildShareLink(code) : '';
     var nameInput = document.getElementById('syncShareNameInput');
-    if (nameInput && document.activeElement !== nameInput) nameInput.value = name;
+    if (nameInput && !shareNameDirty && document.activeElement !== nameInput) nameInput.value = name;
     document.getElementById('syncShareCodeRow').style.display = code ? 'flex' : 'none';
     document.getElementById('syncShareCodeDisplay').textContent = code;
     document.getElementById('syncShareLinkRow').style.display = code ? 'flex' : 'none';
@@ -2337,6 +2420,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       syncConfig.shareCode = (res && res.shareCode) || code;
       syncConfig.shareCreatedAt = (res && res.createdAt) || Date.now();
       syncConfig.shareName = cleanShareNameInput(res && res.shareName != null ? res.shareName : name);
+      shareNameDirty = false;
       saveSyncConfig();
       renderShareBox('');
       syncMsg('✅ 分享链接已生成，复制发给对方即可', 'ok');
@@ -2357,6 +2441,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       shareRefreshSeq++;
       syncConfig.shareCreatedAt = (res && res.createdAt) || Date.now();
       syncConfig.shareName = cleanShareNameInput(res && res.shareName != null ? res.shareName : name);
+      shareNameDirty = false;
       saveSyncConfig();
       renderShareBox('');
       syncMsg(name ? '✅ 分享说明已保存' : '✅ 已清空分享说明', 'ok');
@@ -2378,6 +2463,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       syncConfig.shareCode = null;
       syncConfig.shareCreatedAt = 0;
       syncConfig.shareName = '';
+      shareNameDirty = false;
       saveSyncConfig();
       renderShareBox('revoked');
       syncMsg('✅ 已撤销分享链接', 'ok');
@@ -2538,6 +2624,8 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
 
   function cloudFirst(code, localDoc, remoteDoc) {
     backupLocal('以云端为准前自动备份');
+    // 本地待删除计时不能再影响刚用云端覆盖的数据
+    cancelPendingDeletions();
     persistDoc(remoteDoc);
     render();
     bindSync(code, remoteDoc.rev, '已用云端数据覆盖本地');
@@ -2671,6 +2759,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   function openAddProfile() { openSyncModal(true); }
   function openSyncModal(isAdd) {
     addProfileMode = !!isAdd;
+    shareNameDirty = false;
     document.getElementById('syncEndpointInput').value = localStorage.getItem(SYNC_ENDPOINT_KEY) || '';
     document.getElementById('syncAddNameRow').style.display = isAdd ? 'flex' : 'none';
     document.getElementById('syncNewNameInput').value = '';
@@ -2733,6 +2822,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       var when = b.at ? new Date(b.at).toLocaleString() : '最近一次';
       if (!confirm('将用 ' + when + ' 的备份覆盖当前本地数据。\n覆盖前会再自动备份一次，确定吗？')) return;
       backupLocal('恢复备份前自动备份');
+      cancelPendingDeletions();
       saveRawList(b.holdings.map(SyncCore.cleanRecord).filter(Boolean));
       if (b.settings) applySettings(b.settings, b.settingsUpdatedAt || 0);
       render();
@@ -2801,6 +2891,7 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       silentSync();
     });
     document.getElementById('syncShareGenBtn').addEventListener('click', function () { generateShare(0); });
+    document.getElementById('syncShareNameInput').addEventListener('input', function () { shareNameDirty = true; });
     document.getElementById('syncShareNameSaveBtn').addEventListener('click', saveShareName);
     document.getElementById('syncShareCopyBtn').addEventListener('click', copyShareCode);
     document.getElementById('syncShareCopyLinkBtn').addEventListener('click', copyShareLink);
@@ -2826,7 +2917,11 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
       }
     });
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden && syncConfig && Date.now() - (syncConfig.lastSyncAt || 0) > 60000) silentSync();
+      if (!document.hidden) {
+        // 后台标签页定时器可能被浏览器节流，回到前台时补一次到期检查
+        sweepPendingDeletions();
+        if (syncConfig && Date.now() - (syncConfig.lastSyncAt || 0) > 60000) silentSync();
+      }
     });
 
     if (syncConfig && hasSyncedMarker(syncConfig.code)) {
@@ -2869,6 +2964,9 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
   if (document.getElementById('mergeCb').checked) {
     document.getElementById('switchTrack').classList.add('on');
   }
+  // 先恢复未完成的延迟删除（跨刷新继续计时，已到期的立即写成墓碑）
+  loadPendingDeletions();
+  sweepPendingDeletions();
   // 先应用只读状态，避免只读端首屏闪现可编辑界面
   applyReadOnlyUI();
   render();
@@ -2879,6 +2977,8 @@ body.readonly #settingsPageBtn { opacity: .45; cursor: default; }
     refreshPrices().then(function() { render(); });
   }
   setInterval(function() {
+    // 即使行情休市，也要检查延迟删除是否到期
+    sweepPendingDeletions();
     if (isMarketOpen()) {
       refreshPrices().then(function() { render(); });
     }
